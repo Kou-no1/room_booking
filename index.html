@@ -3,548 +3,460 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>特別教室予約システム</title>
+<title>先生のためのアプリ集</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
-/* ★ここにGASのデプロイURLを入れる */
-/* API_URL は script タグで定義 */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#fff;--bg2:#f5f5f3;--bg3:#eeecea;
-  --text:#1a1a18;--text2:#5f5e5a;--text3:#9a9890;
-  --border:rgba(0,0,0,0.12);--border2:rgba(0,0,0,0.22);
-  --p50:#eeedfe;--p100:#cecbf6;--p200:#afa9ec;
-  --p600:#534ab7;--p900:#26215c;
-  --g50:#f1efe8;--g400:#888780;--g600:#5f5e5a;
-  --danger:#e24b4a;--info:#185fa5;
-  --r:8px;--rl:12px;
-}
-body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;background:var(--bg2);color:var(--text);font-size:14px;line-height:1.5;min-height:100vh}
+  :root {
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --border: #e5e3dd;
+    --border-hover: #c8c5bc;
+    --text-primary: #1a1a18;
+    --text-secondary: #6b6a65;
+    --text-muted: #9e9c97;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --radius-pill: 999px;
+  }
 
-/* ヘッダー */
-.hdr{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 16px;height:52px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100}
-.hdr-title{font-size:15px;font-weight:500}
-.hdr-sep{flex:1}
-.tab-btn{padding:6px 14px;font-size:13px;border:none;border-radius:0;border-bottom:2px solid transparent;background:transparent;color:var(--text3);cursor:pointer;height:52px;font-family:inherit}
-.tab-btn:hover{color:var(--text)}
-.tab-btn.active{color:var(--p600);border-bottom-color:var(--p600);font-weight:500}
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    min-height: 100vh;
+    padding: 0 0 4rem;
+  }
 
-/* レイアウト */
-.layout{display:flex;gap:16px;max-width:1200px;margin:0 auto;padding:16px;align-items:flex-start}
+  /* ── Header ── */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 2rem 1.5rem 1.5rem;
+    text-align: center;
+  }
+  .header h1 {
+    font-size: clamp(20px, 4vw, 26px);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .header p {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-top: 6px;
+  }
 
-/* サイドバー */
-.sidebar{width:160px;flex-shrink:0;background:var(--bg);border:.5px solid var(--border);border-radius:var(--rl);overflow:hidden}
-.sb-title{padding:10px 12px;font-size:11px;font-weight:500;color:var(--text3);letter-spacing:.05em;border-bottom:.5px solid var(--border);background:var(--bg2)}
-.room-btn{display:block;width:100%;padding:10px 12px;font-size:13px;color:var(--text2);background:transparent;border:none;border-bottom:.5px solid var(--border);cursor:pointer;text-align:left;font-family:inherit;transition:background .1s}
-.room-btn:last-child{border-bottom:none}
-.room-btn:hover{background:var(--bg2);color:var(--text)}
-.room-btn.active{background:var(--p50);color:var(--p900);font-weight:500}
+  /* ── Main container ── */
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 1.25rem 0;
+  }
 
-/* カレンダー */
-.cal-wrap{flex:1;min-width:0}
-.cal-hdr{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
-.cal-room{font-size:16px;font-weight:500}
-.cal-hdr-r{margin-left:auto;display:flex;align-items:center;gap:6px}
-.week-lbl{font-size:13px;color:var(--text2);min-width:170px;text-align:center}
-.legend{display:flex;gap:16px;margin-bottom:10px;font-size:12px;color:var(--text3);flex-wrap:wrap}
-.ldot{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:4px}
-.grid-wrap{background:var(--bg);border:.5px solid var(--border);border-radius:var(--rl);overflow:hidden;overflow-x:auto}
-.grid{display:grid;grid-template-columns:52px repeat(5,1fr);min-width:480px}
-.g-hdr{padding:10px 4px;font-size:12px;color:var(--text3);text-align:center;border-bottom:.5px solid var(--border);border-right:.5px solid var(--border);white-space:pre-line;line-height:1.3;background:var(--bg2)}
-.g-per{padding:0 4px;font-size:11px;color:var(--text3);text-align:center;border-bottom:.5px solid var(--border);border-right:.5px solid var(--border);display:flex;align-items:center;justify-content:center;background:var(--bg2)}
-.g-cell{position:relative;min-height:64px;border-bottom:.5px solid var(--border);border-right:.5px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:6px 4px;font-size:13px;text-align:center;line-height:1.25;background:var(--bg);border-top:none;border-left:none;border-radius:0;font-family:inherit;color:var(--text);outline:none;transition:filter .1s}
-.g-cell:hover{filter:brightness(.96)}
-.g-cell:focus{box-shadow:inset 0 0 0 2px var(--p200)}
-.g-cell.empty{color:var(--text3);font-size:18px}
-.g-cell.pri{background:var(--g50)}
-.g-cell.booked{background:var(--p50)}
-.cell-cls{font-weight:500;color:var(--p900);font-size:13px}
-.cell-tchr{font-size:11px;color:var(--p600);margin-top:1px}
-.cell-pribadge{font-size:10px;color:var(--g400);margin-bottom:2px}
+  /* ── Filter bar ── */
+  .filter-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 1.75rem;
+  }
+  .filter-btn {
+    padding: 6px 16px;
+    font-size: 13px;
+    font-family: inherit;
+    font-weight: 400;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+  }
+  .filter-btn:hover {
+    border-color: var(--border-hover);
+    color: var(--text-primary);
+  }
+  .filter-btn.active {
+    background: var(--text-primary);
+    color: #fff;
+    border-color: var(--text-primary);
+  }
 
-/* ツールチップ */
-.tip{position:fixed;z-index:200;background:var(--text);color:#fff;font-size:11px;padding:5px 9px;border-radius:6px;pointer-events:none;white-space:nowrap;opacity:0;transition:opacity .15s}
-.tip.show{opacity:1}
+  /* ── Section label ── */
+  .section-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    margin-top: 2rem;
+  }
+  .section-label:first-of-type { margin-top: 0; }
 
-/* ボタン共通 */
-button{display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:6px 14px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg);border:.5px solid var(--border2);border-radius:var(--r);cursor:pointer;transition:background .1s,transform .08s}
-button:hover{background:var(--bg2)}
-button:active{transform:scale(.97)}
-button.icon{width:32px;height:32px;padding:0}
-button.primary{background:var(--p50);color:var(--p900);border-color:var(--p200);font-weight:500}
-button.danger{color:var(--danger);border-color:rgba(226,75,74,.3)}
-button.danger:hover{background:#fcebeb}
-button:disabled{opacity:.5;cursor:not-allowed}
+  /* ── Grid ── */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 10px;
+    margin-bottom: 0.5rem;
+  }
 
-/* モーダル */
-.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:300;align-items:center;justify-content:center;padding:16px}
-.modal-bg.show{display:flex}
-.modal{background:var(--bg);border-radius:var(--rl);padding:20px;width:100%;max-width:400px}
-.modal-title{font-size:16px;font-weight:500;margin-bottom:4px}
-.modal-sub{font-size:13px;color:var(--text2);margin-bottom:14px}
-.pri-hint{font-size:12px;color:var(--g600);background:var(--g50);border-radius:var(--r);padding:7px 10px;margin-bottom:12px;display:none}
-.form-row{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
-select,input[type=text]{font-family:inherit;font-size:13px;padding:7px 10px;border:.5px solid var(--border2);border-radius:var(--r);background:var(--bg);color:var(--text);-webkit-appearance:none;appearance:none;outline:none}
-select:focus,input:focus{box-shadow:0 0 0 2px var(--p200);border-color:var(--p200)}
-select{padding-right:28px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24'%3E%3Cpath fill='%23888' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center}
-input[type=text]{flex:1;min-width:140px}
-.err-msg{font-size:12px;color:var(--danger);margin-bottom:8px;display:none}
-.last-edit{font-size:11px;color:var(--text3);margin-bottom:12px;display:none}
-.btn-row{display:flex;gap:8px;margin-top:4px}
+  /* ── Card ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.1rem 1.15rem 1rem;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+  }
+  .card:hover {
+    border-color: var(--border-hover);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    transform: translateY(-2px);
+  }
+  .card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .icon-wrap {
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .tag {
+    font-size: 11px;
+    padding: 3px 9px;
+    border-radius: var(--radius-pill);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .card-title {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 5px;
+    line-height: 1.4;
+  }
+  .card-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
 
-/* 優先クラス管理 */
-.pri-panel{display:none;flex:1;min-width:0}
-.pri-panel.show{display:block}
-.card{background:var(--bg);border:.5px solid var(--border);border-radius:var(--rl);padding:16px;margin-bottom:16px}
-.card-title{font-size:13px;font-weight:500;margin-bottom:12px}
-.pri-list{list-style:none}
-.pri-list li{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:.5px solid var(--border);font-size:13px}
-.pri-list li:last-child{border-bottom:none}
-.p-room{color:var(--text2);min-width:140px}
-.p-slot{color:var(--text3);min-width:80px}
-.p-cls{font-weight:500;min-width:80px}
+  /* ── Category colors ── */
+  .cat-timer   .icon-wrap { background: #dff0ff; }
+  .cat-lottery .icon-wrap { background: #ede9fe; }
+  .cat-group   .icon-wrap { background: #dcfce7; }
+  .cat-class   .icon-wrap { background: #fef3c7; }
+  .cat-admin   .icon-wrap { background: #ffe4e6; }
+  .cat-event    .icon-wrap { background: #d1fae5; }
+  .cat-facility .icon-wrap { background: #e0f2fe; }
 
-/* ローディング */
-.loading{text-align:center;padding:48px;color:var(--text3);font-size:14px}
+  .tag-timer    { background: #dff0ff; color: #1e60a8; }
+  .tag-lottery  { background: #ede9fe; color: #5b21b6; }
+  .tag-group    { background: #dcfce7; color: #166534; }
+  .tag-class    { background: #fef3c7; color: #92400e; }
+  .tag-admin    { background: #ffe4e6; color: #9f1239; }
+  .tag-event    { background: #d1fae5; color: #065f46; }
+  .tag-facility { background: #e0f2fe; color: #0369a1; }
 
-/* API設定バナー */
-.api-banner{background:#fffbe6;border:.5px solid #f0c040;border-radius:var(--r);padding:12px 16px;margin-bottom:16px;font-size:13px;color:#7a5c00;display:none}
-.api-banner.show{display:block}
+  /* ── Hidden ── */
+  .card.hidden { display: none; }
+  .section-block.hidden { display: none; }
 
-@media(max-width:640px){
-  .layout{flex-direction:column;padding:8px;gap:8px}
-  .sidebar{width:100%}
-  .room-btn{display:inline-block;width:auto;border-bottom:none;border:.5px solid var(--border);border-radius:var(--r);margin:4px}
-  .sb-title{display:none}
-}
+  /* ── Footer ── */
+  .footer {
+    text-align: center;
+    margin-top: 3rem;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 480px) {
+    .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+    .filter-btn { font-size: 12px; padding: 5px 12px; }
+  }
 </style>
 </head>
 <body>
 
-<!-- ★★★ GAS デプロイURLをここに設定 ★★★ -->
-<script>
-const API_URL = 'https://script.google.com/macros/s/AKfycbzwdBlpjAUgz1SUNhysy0Vq-uWGFfLpIIJMjr9kxduEMpngy0bf9krZ50s9rDFb9kVN/exec';
-</script>
-
-<header class="hdr">
-  <span class="hdr-title">📋 特別教室予約システム</span>
-  <div class="hdr-sep"></div>
-  <button class="tab-btn active" id="tabCal" onclick="switchTab('cal')">週間カレンダー</button>
-  <button class="tab-btn" id="tabPri" onclick="switchTab('pri')">優先クラス管理</button>
-</header>
-
-<div class="layout">
-  <nav class="sidebar">
-    <div class="sb-title">教室</div>
-    <div id="roomList"><div class="loading" style="padding:16px;font-size:12px;">読込中...</div></div>
-  </nav>
-
-  <!-- カレンダーパネル -->
-  <main class="cal-wrap" id="calPanel">
-    <div class="api-banner" id="apiBanner">
-      ⚠ API_URLが未設定です。index.html冒頭の <code>API_URL</code> にGASのデプロイURLを入力してください。
-    </div>
-    <div class="cal-hdr">
-      <span class="cal-room" id="roomName">—</span>
-      <div class="cal-hdr-r">
-        <button class="icon" onclick="shiftWeek(-1)" aria-label="前の週">&#8249;</button>
-        <span class="week-lbl" id="weekLbl">—</span>
-        <button class="icon" onclick="shiftWeek(1)" aria-label="次の週">&#8250;</button>
-        <button onclick="goToday()">今週</button>
-      </div>
-    </div>
-    <div class="legend">
-      <span><span class="ldot" style="background:var(--bg);border:.5px solid var(--border2)"></span>空き</span>
-      <span><span class="ldot" style="background:var(--g50);border:.5px solid var(--border2)"></span>優先クラスあり</span>
-      <span><span class="ldot" style="background:var(--p50);border:.5px solid var(--border2)"></span>予約済み</span>
-    </div>
-    <div class="grid-wrap">
-      <div class="grid" id="grid">
-        <div class="loading" style="grid-column:1/-1">読み込み中...</div>
-      </div>
-    </div>
-    <p style="font-size:11px;color:var(--text3);margin-top:8px;">セルをタップして予約・取消。予約済みセルにカーソルを合わせると更新者が確認できます。</p>
-  </main>
-
-  <!-- 優先クラス管理パネル -->
-  <div class="pri-panel" id="priPanel">
-    <div class="card">
-      <p class="card-title">優先クラスを登録</p>
-      <p style="font-size:12px;color:var(--text3);margin-bottom:12px;">年度当初に各教室・曜日・校時の優先クラスを設定します。予約がない枠に薄く表示されます。</p>
-      <div class="form-row">
-        <select id="priRoom" style="min-width:160px"></select>
-        <select id="priDay">
-          <option value="0">月曜</option><option value="1">火曜</option><option value="2">水曜</option>
-          <option value="3">木曜</option><option value="4">金曜</option>
-        </select>
-        <select id="priPeriod">
-          <option value="1">1校時</option><option value="2">2校時</option><option value="3">3校時</option>
-          <option value="4">4校時</option><option value="5">5校時</option><option value="6">6校時</option>
-        </select>
-        <select id="priClass" style="min-width:120px"></select>
-      </div>
-      <button class="primary" onclick="addPriority()">登録する</button>
-    </div>
-    <div class="card" style="padding:0;overflow:hidden">
-      <p style="font-size:12px;color:var(--text3);padding:10px 16px;background:var(--bg2);border-bottom:.5px solid var(--border)">登録済み優先クラス</p>
-      <ul class="pri-list" id="priList" style="padding:0 16px"></ul>
-    </div>
-  </div>
+<div class="header">
+  <h1>🏫 先生のためのアプリ集</h1>
+  <p>カテゴリを選んで、使いたいアプリを見つけてください</p>
 </div>
 
-<!-- ツールチップ -->
-<div class="tip" id="tip"></div>
+<div class="container">
 
-<!-- 予約モーダル -->
-<div class="modal-bg" id="modalBg" onclick="if(event.target===this)closeModal()">
-  <div class="modal" role="dialog" aria-modal="true">
-    <p class="modal-title" id="mTitle">予約</p>
-    <p class="modal-sub" id="mSub"></p>
-    <div class="pri-hint" id="mHint"></div>
-    <div class="form-row">
-      <select id="gradeSel"></select>
-      <select id="classSel"></select>
-      <input type="text" id="teacherIn" placeholder="担任名（必須）">
-    </div>
-    <p class="err-msg" id="errMsg">担任名を入力してください</p>
-    <p class="last-edit" id="lastEdit"></p>
-    <div class="btn-row">
-      <button class="primary" id="saveBtn" onclick="saveBooking()">予約する</button>
-      <button class="danger" id="delBtn" onclick="deleteBooking()" style="display:none">取消</button>
-      <button onclick="closeModal()" style="margin-left:auto">閉じる</button>
+  <!-- Filter -->
+  <div class="filter-bar">
+    <button class="filter-btn active" data-filter="all">すべて</button>
+    <button class="filter-btn" data-filter="facility">🏫 施設管理</button>
+    <button class="filter-btn" data-filter="timer">⏱ タイマー</button>
+    <button class="filter-btn" data-filter="lottery">🎲 抽選</button>
+    <button class="filter-btn" data-filter="group">👥 グルーピング</button>
+    <button class="filter-btn" data-filter="class">📚 授業</button>
+    <button class="filter-btn" data-filter="admin">📋 校務</button>
+    <button class="filter-btn" data-filter="event">🏃 校外学習</button>
+  </div>
+
+  <!-- 施設管理 -->
+  <div class="section-block" data-section="facility">
+    <div class="section-label">施設管理</div>
+    <div class="grid">
+      <a class="card cat-facility" data-cat="facility" href="https://kou-no1.github.io/room_booking/" target="_blank">
+        <div class="card-top">
+          <div class="icon-wrap">🏫</div>
+          <span class="tag tag-facility">施設管理</span>
+        </div>
+        <div class="card-title">特別教室予約システム</div>
+        <div class="card-desc">優先・予約クラスを一覧管理</div>
+      </a>
     </div>
   </div>
+
+  <!-- タイマー -->
+  <div class="section-block" data-section="timer">
+    <div class="section-label">タイマー</div>
+    <div class="grid">
+      <a class="card cat-timer" data-cat="timer" href="https://kou-no1.github.io/hachiware_timer/" target="_blank">
+        <div class="card-top">
+          <div class="icon-wrap">🐱</div>
+          <span class="tag tag-timer">タイマー</span>
+        </div>
+        <div class="card-title">はちわれタイマー</div>
+        <div class="card-desc">数字ボタンで直感操作。かわいいはちわれが動く</div>
+      </a>
+      <a class="card cat-timer" data-cat="timer" href="https://kou-no1.github.io/UFO_Timer/" target="_blank">
+        <div class="card-top">
+          <div class="icon-wrap">👽</div>
+          <span class="tag tag-timer">タイマー</span>
+        </div>
+        <div class="card-title">UFOタイマー</div>
+        <div class="card-desc">ミッションをコンプリートせよ！</div>
+      </a>
+    </div>
+  </div>
+
+  <!-- 抽選 -->
+  <div class="section-block" data-section="lottery">
+    <div class="section-label">抽選・ビンゴ</div>
+    <div class="grid">
+      <a class="card cat-lottery" data-cat="lottery" href="https://kou-no1.github.io/gorilla_draw/" target="_blank">
+        <div class="card-top">
+          <div class="icon-wrap">🦍</div>
+          <span class="tag tag-lottery">抽選</span>
+        </div>
+        <div class="card-title">ゴリラドロー</div>
+        <div class="card-desc">母数を一発選択。派手な演出で結果発表。履歴表示あり</div>
+      </a>
+      <a class="card cat-lottery" data-cat="lottery" href="https://kou-no1.github.io/mgical_cat_draw/" target="_blank">
+        <div class="card-top">
+          <div class="icon-wrap">🪄</div>
+          <span class="tag tag-lottery">抽選</span>
+        </div>
+        <div class="card-title">マジカルキャットドロー</div>
+        <div class="card-desc">しろねこが占う本格抽選アプリ</div>
+      </a>
+      <a class="card cat-lottery" data-cat="lottery" href="https://kou-no1.github.io/UFO_draw/" target="_blank">
+        <div class="card-top">
+          <div class="icon-wrap">👽</div>
+          <span class="tag tag-lottery">抽選</span>
+        </div>
+        <div class="card-title">UFOドロー</div>
+        <div class="card-desc">宇宙人が抽選する個性派アプリ</div>
+      </a>
+      <a class="card cat-lottery" data-cat="lottery" href="https://kou-no1.github.io/Bingo/" target="_blank">
+        <div class="card-top">
+          <div class="icon-wrap">🎯</div>
+          <span class="tag tag-lottery">抽選</span>
+        </div>
+        <div class="card-title">ドキドキ BINGO</div>
+        <div class="card-desc">ビンゴルーレットアプリ</div>
+      </a>
+    </div>
+  </div>
+
+  <!-- グルーピング -->
+  <div class="section-block" data-section="group">
+    <div class="section-label">グルーピング・席替え</div>
+    <div class="grid">
+      <a class="card cat-group" data-cat="group" href="https://kou-no1.github.io/grouping/" target="_blank">
+        <div class="card-top">
+          <div class="icon-wrap">👥</div>
+          <span class="tag tag-group">グルーピング</span>
+        </div>
+        <div class="card-title">グルーピング</div>
+        <div class="card-desc">名簿貼り付け・Excel読み込み対応。PDF出力まで完結</div>
+      </a>
+      <a class="card cat-group" data-cat="group" href="https://kou-no1.github.io/Sekigae/" target="_blank">
+        <div class="card-top">
+          <div class="icon-wrap">💺</div>
+          <span class="tag tag-group">グルーピング</span>
+        </div>
+        <div class="card-title">席替えアプリ</div>
+        <div class="card-desc">NGペア・固定席・エリア指定・シークレットモード搭載。A4印刷対応</div>
+      </a>
+    </div>
+  </div>
+
+  <!-- 授業 -->
+  <div class="section-block" data-section="class">
+    <div class="section-label">授業</div>
+    <div class="grid">
+      <a class="card cat-class" data-cat="class" href="https://kou-no1.github.io/cocoro_meter/" target="_blank">
+        <div class="card-top">
+          <div class="icon-wrap">❤️</div>
+          <span class="tag tag-class">授業</span>
+        </div>
+        <div class="card-title">道徳心情メーター</div>
+        <div class="card-desc">集計＆マッピング。ミライシードにない機能。出席番号で送信</div>
+      </a>
+      <a class="card cat-class" data-cat="class" href="https://kou-no1.github.io/hidden_hand/" target="_blank">
+        <div class="card-top">
+          <div class="icon-wrap">🙋</div>
+          <span class="tag tag-class">授業</span>
+        </div>
+        <div class="card-title">「分からない」隠し挙手</div>
+        <div class="card-desc">端末から先生だけに「分からない」を送信。つまずきポイントを早期発見</div>
+      </a>
+    </div>
+  </div>
+
+  <!-- 校外学習 -->
+  <div class="section-block" data-section="event">
+    <div class="section-label">校外学習</div>
+    <div class="grid">
+      <a class="card cat-event" data-cat="event" href="https://kou-no1.github.io/kougai_check/" target="_blank">
+        <div class="card-top">
+          <div class="icon-wrap">📍</div>
+          <span class="tag tag-event">校外学習</span>
+        </div>
+        <div class="card-title">チェックポイント管理</div>
+        <div class="card-desc">引率教員間でCP通過をリアルタイム一覧管理</div>
+      </a>
+    </div>
+  </div>
+
+  <!-- 校務 -->
+  <div class="section-block" data-section="admin">
+    <div class="section-label">校務・ツール</div>
+    <div class="grid">
+      <a class="card cat-admin" data-cat="admin" href="https://kou-no1.github.io/masume/" target="_blank">
+        <div class="card-top">
+          <div class="icon-wrap">📝</div>
+          <span class="tag tag-admin">校務</span>
+        </div>
+        <div class="card-title">マス目・罫線ジェネレーター</div>
+        <div class="card-desc">宿題や授業プリントをすぐ作成・印刷</div>
+      </a>
+      <a class="card cat-admin" data-cat="admin" href="https://docs.google.com/spreadsheets/d/1jL5ci3mFowWhXLy29J38WaXiCGtX58rPzQQgZOtv7ic/edit?gid=377669968#gid=377669968" target="_blank">
+        <div class="card-top">
+          <div class="icon-wrap">🔀</div>
+          <span class="tag tag-admin">校務</span>
+        </div>
+        <div class="card-title">当番表ランダム作成</div>
+        <div class="card-desc">ボタン一つで当番表を作り直し。月交代に便利</div>
+      </a>
+      <a class="card cat-admin" data-cat="admin" href="https://docs.google.com/spreadsheets/d/1FCkUxXqqes13Pl91zmXugz5dqac0KOXfjQhMn7RdiJw/edit?gid=377669968#gid=377669968" target="_blank">
+        <div class="card-top">
+          <div class="icon-wrap">🔄</div>
+          <span class="tag tag-admin">校務</span>
+        </div>
+        <div class="card-title">当番表ローテーション</div>
+        <div class="card-desc">上下ボタンでローテーション。シンプルに使いたい人向け</div>
+      </a>
+      <a class="card cat-admin" data-cat="admin" href="https://kou-no1.github.io/kirinuki/" target="_blank">
+        <div class="card-top">
+          <div class="icon-wrap">✂️</div>
+          <span class="tag tag-admin">校務</span>
+        </div>
+        <div class="card-title">顔写真切り抜き 4:3</div>
+        <div class="card-desc">一括切り抜き・保存。ブラウザ内完結で流出の心配なし</div>
+      </a>
+      <a class="card cat-admin" data-cat="admin" href="https://kou-no1.github.io/shukusho/" target="_blank">
+        <div class="card-top">
+          <div class="icon-wrap">🖼️</div>
+          <span class="tag tag-admin">校務</span>
+        </div>
+        <div class="card-title">画像縮小専門</div>
+        <div class="card-desc">割合を設定して一括リサイズ・保存</div>
+      </a>
+      <a class="card cat-admin" data-cat="admin" href="https://kou-no1.github.io/PDF_renketu/" target="_blank">
+        <div class="card-top">
+          <div class="icon-wrap">📎</div>
+          <span class="tag tag-admin">校務</span>
+        </div>
+        <div class="card-title">PDF連結くん</div>
+        <div class="card-desc">複数PDFをまとめて結合</div>
+      </a>
+      <a class="card cat-admin" data-cat="admin" href="https://kou-no1.github.io/thumb_print/" target="_blank">
+        <div class="card-top">
+          <div class="icon-wrap">🗂️</div>
+          <span class="tag tag-admin">校務</span>
+        </div>
+        <div class="card-title">画像サムネイル一覧</div>
+        <div class="card-desc">顔写真を一覧表示。ファイル名（名前）も自動表示</div>
+      </a>
+      <a class="card cat-admin" data-cat="admin" href="https://docs.google.com/spreadsheets/d/1FrG-074jh6DY0UJiozhYV4tHdFLVqdb56g-YCtk2JOY/edit?gid=1391553984#gid=1391553984" target="_blank">
+        <div class="card-top">
+          <div class="icon-wrap">💰</div>
+          <span class="tag tag-admin">校務</span>
+        </div>
+        <div class="card-title">学年会計システム</div>
+        <div class="card-desc">学年のお金の管理をスプレッドシートで一元化</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="footer">
+    <p>各アプリはブラウザ内で動作します &nbsp;·&nbsp; 個人情報はサーバーに送信されません</p>
+  </div>
+
 </div>
 
 <script>
-// ==========================================
-// 定数
-// ==========================================
-const DAYS    = ['月','火','水','木','金'];
-const PERIODS = [1,2,3,4,5,6];
-const ALL_CLASSES = [
-  '1年1組','1年2組','1年3組',
-  '2年1組','2年2組','2年3組',
-  '3年1組','3年2組','3年3組',
-  '4年1組','4年2組','4年3組',
-  '5年1組','5年2組','5年3組',
-  '6年1組','6年2組','6年3組',
-  'けやき学級'
-];
+  const btns = document.querySelectorAll('.filter-btn');
+  const cards = document.querySelectorAll('.card');
+  const sections = document.querySelectorAll('.section-block');
 
-// ==========================================
-// 状態
-// ==========================================
-const st = {
-  rooms:[],priorities:[],bookings:[],
-  roomId:null,weekStart:mondayOf(new Date())
-};
-let activeCell = null;
+  btns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      btns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
 
-// ==========================================
-// API
-// ==========================================
-async function api(method, params) {
-  if(!API_URL || API_URL.includes('YOUR_DEPLOYMENT_ID')){
-    document.getElementById('apiBanner').classList.add('show');
-    throw new Error('API_URL未設定');
-  }
-  if(method === 'GET'){
-    const qs = new URLSearchParams(params).toString();
-    const r = await fetch(API_URL + (qs ? '?'+qs : ''), {redirect:'follow'});
-    return r.json();
-  } else {
-    const r = await fetch(API_URL, {
-      method:'POST', redirect:'follow',
-      headers:{'Content-Type':'text/plain'},
-      body: JSON.stringify(params)
-    });
-    return r.json();
-  }
-}
+      const filter = btn.dataset.filter;
 
-// ==========================================
-// 初期化
-// ==========================================
-window.addEventListener('DOMContentLoaded', async () => {
-  // セレクト初期化
-  const gs = document.getElementById('gradeSel');
-  const cs = document.getElementById('classSel');
-  [1,2,3,4,5,6].forEach(g=>{ const o=document.createElement('option');o.value=g;o.textContent=g+'年';gs.appendChild(o); });
-  [1,2,3].forEach(c=>{ const o=document.createElement('option');o.value=c;o.textContent=c+'組';cs.appendChild(o); });
-  const ke=document.createElement('option');ke.value='けやき';ke.textContent='けやき学級';gs.appendChild(ke);
+      cards.forEach(card => {
+        if (filter === 'all' || card.dataset.cat === filter) {
+          card.classList.remove('hidden');
+        } else {
+          card.classList.add('hidden');
+        }
+      });
 
-  const pc = document.getElementById('priClass');
-  ALL_CLASSES.forEach(cl=>{ const o=document.createElement('option');o.value=cl;o.textContent=cl;pc.appendChild(o); });
-
-  try {
-    const d = await api('GET',{action:'init'});
-    if(!d.ok) throw new Error(d.error);
-    st.rooms      = d.rooms;
-    st.priorities = d.priorities;
-    st.bookings   = d.bookings;
-    buildRoomList();
-    buildPriRoomSel();
-    if(st.rooms.length) selectRoom(st.rooms[0].id);
-    renderPriList();
-  } catch(e) {
-    document.getElementById('grid').innerHTML = '<div class="loading">読み込みエラー: '+esc(e.message)+'</div>';
-  }
-});
-
-// ==========================================
-// 教室リスト
-// ==========================================
-function buildRoomList(){
-  const el = document.getElementById('roomList');
-  el.innerHTML = '';
-  st.rooms.forEach(r=>{
-    const b = document.createElement('button');
-    b.className='room-btn'; b.textContent=r.name; b.dataset.id=r.id;
-    b.onclick=()=>selectRoom(r.id);
-    el.appendChild(b);
-  });
-}
-function selectRoom(id){
-  st.roomId = id;
-  document.querySelectorAll('.room-btn').forEach(b=>b.classList.toggle('active',b.dataset.id===id));
-  const r = st.rooms.find(x=>x.id===id);
-  document.getElementById('roomName').textContent = r ? r.name : '';
-  renderCal();
-}
-function buildPriRoomSel(){
-  const s = document.getElementById('priRoom'); s.innerHTML='';
-  st.rooms.forEach(r=>{ const o=document.createElement('option');o.value=r.id;o.textContent=r.name;s.appendChild(o); });
-}
-
-// ==========================================
-// カレンダー描画
-// ==========================================
-function renderCal(){
-  const grid = document.getElementById('grid');
-  grid.innerHTML = '';
-  const end = addDays(st.weekStart, 4);
-  document.getElementById('weekLbl').textContent =
-    st.weekStart.getFullYear()+'年 '+(st.weekStart.getMonth()+1)+'/'+st.weekStart.getDate()+
-    ' 〜 '+(end.getMonth()+1)+'/'+end.getDate();
-
-  // ヘッダー
-  const ch = document.createElement('div'); ch.className='g-hdr'; grid.appendChild(ch);
-  DAYS.forEach((d,i)=>{
-    const dt = addDays(st.weekStart,i);
-    const el = document.createElement('div'); el.className='g-hdr';
-    el.textContent = d+'\n'+(dt.getMonth()+1)+'/'+dt.getDate();
-    grid.appendChild(el);
-  });
-
-  // 校時行
-  PERIODS.forEach(p=>{
-    const pl = document.createElement('div'); pl.className='g-per'; pl.textContent=p+'時限'; grid.appendChild(pl);
-    DAYS.forEach((_,i)=>{
-      const dt  = addDays(st.weekStart,i);
-      const ds  = ymd(dt);
-      const bk  = st.bookings.find(b=>b.roomId===st.roomId&&b.date===ds&&b.period===p);
-      const pri = st.priorities.find(pr=>pr.roomId===st.roomId&&pr.dayIdx===i&&pr.period===p);
-      grid.appendChild(mkCell(ds, p, bk, pri));
+      sections.forEach(sec => {
+        const visibleCards = sec.querySelectorAll('.card:not(.hidden)');
+        sec.classList.toggle('hidden', visibleCards.length === 0);
+      });
     });
   });
-}
-
-function mkCell(dateStr, period, bk, pri){
-  const btn = document.createElement('button');
-  btn.className = 'g-cell';
-  if(bk){
-    btn.classList.add('booked');
-    btn.innerHTML =
-      '<span class="cell-cls">'+esc(bk.classLabel)+'</span>'+
-      (bk.teacher?'<span class="cell-tchr">'+esc(bk.teacher)+'</span>':'');
-    const ts = bk.updatedAt ? fmtDT(bk.updatedAt)+' · '+esc(bk.teacher) : esc(bk.teacher);
-    btn.dataset.tip = '最終更新 '+ts;
-    btn.addEventListener('mouseenter', showTip);
-    btn.addEventListener('mousemove',  moveTip);
-    btn.addEventListener('mouseleave', hideTip);
-  } else if(pri){
-    btn.classList.add('pri');
-    btn.innerHTML='<span class="cell-pribadge">優先</span><span style="font-size:13px;color:var(--g600)">'+esc(pri.label)+'</span>';
-  } else {
-    btn.classList.add('empty'); btn.textContent='+';
-  }
-  btn.onclick = ()=>openModal(dateStr,period,bk,pri);
-  return btn;
-}
-
-// ==========================================
-// ツールチップ
-// ==========================================
-const tipEl = document.getElementById('tip');
-function showTip(e){ tipEl.textContent=e.currentTarget.dataset.tip; tipEl.classList.add('show'); moveTip(e); }
-function moveTip(e){ tipEl.style.left=(e.clientX+14)+'px'; tipEl.style.top=(e.clientY-28)+'px'; }
-function hideTip(){ tipEl.classList.remove('show'); }
-
-// ==========================================
-// モーダル
-// ==========================================
-function openModal(dateStr, period, bk, pri){
-  activeCell = {dateStr, period};
-  const r = st.rooms.find(x=>x.id===st.roomId);
-  document.getElementById('mTitle').textContent = (r?r.name:'') + ' · ' + period + '校時';
-  document.getElementById('mSub').textContent =
-    dateStr.slice(0,4)+'/'+dateStr.slice(4,6)+'/'+dateStr.slice(6,8)+
-    ' ('+DAYS[getDayIdx(dateStr)]+')';
-  document.getElementById('errMsg').style.display='none';
-
-  const hint = document.getElementById('mHint');
-  if(pri){ hint.style.display=''; hint.textContent='⚠ この枠の優先クラスは「'+esc(pri.label)+'」です'; }
-  else hint.style.display='none';
-
-  if(bk){
-    parseLabel(bk.classLabel);
-    document.getElementById('teacherIn').value = bk.teacher||'';
-    document.getElementById('delBtn').style.display='';
-    document.getElementById('saveBtn').textContent='更新する';
-    const le = document.getElementById('lastEdit');
-    if(bk.updatedAt){ le.style.display=''; le.textContent='最終更新 '+fmtDT(bk.updatedAt)+' · '+(bk.teacher||''); }
-    else le.style.display='none';
-  } else {
-    if(pri) parseLabel(pri.label); else{ document.getElementById('gradeSel').value=1; document.getElementById('classSel').value=1; }
-    document.getElementById('teacherIn').value='';
-    document.getElementById('delBtn').style.display='none';
-    document.getElementById('saveBtn').textContent='予約する';
-    document.getElementById('lastEdit').style.display='none';
-  }
-  document.getElementById('modalBg').classList.add('show');
-  setTimeout(()=>document.getElementById('teacherIn').focus(),50);
-}
-function closeModal(){ document.getElementById('modalBg').classList.remove('show'); activeCell=null; }
-
-async function saveBooking(){
-  const cell = activeCell;
-  if(!cell) return;
-  const teacher = document.getElementById('teacherIn').value.trim();
-  if(!teacher){ document.getElementById('errMsg').style.display=''; document.getElementById('teacherIn').focus(); return; }
-  const classLabel = buildLabel();
-  const roomId = st.roomId;
-  const btn = document.getElementById('saveBtn');
-  btn.disabled=true; btn.textContent='送信中…';
-  try{
-    const res = await api('POST',{action:'saveBooking',roomId,dateStr:cell.dateStr,period:cell.period,classLabel,teacher});
-    if(!res.ok) throw new Error(res.error);
-    st.bookings = st.bookings.filter(b=>!(b.roomId===roomId&&b.date===cell.dateStr&&b.period===cell.period));
-    st.bookings.push({roomId,date:cell.dateStr,period:cell.period,classLabel,teacher,updatedAt:Date.now()});
-    closeModal(); renderCal();
-  } catch(e){
-    alert('エラー: '+e.message);
-  } finally{
-    btn.disabled=false; btn.textContent='予約する';
-  }
-}
-
-async function deleteBooking(){
-  const cell = activeCell;
-  if(!cell) return;
-  if(!confirm('この予約を取消しますか？')) return;
-  const teacher = document.getElementById('teacherIn').value.trim()||'(不明)';
-  const roomId = st.roomId;
-  try{
-    const res = await api('POST',{action:'deleteBooking',roomId,dateStr:cell.dateStr,period:cell.period,teacher});
-    if(!res.ok) throw new Error(res.error);
-    st.bookings = st.bookings.filter(b=>!(b.roomId===roomId&&b.date===cell.dateStr&&b.period===cell.period));
-    closeModal(); renderCal();
-  } catch(e){ alert('エラー: '+e.message); }
-}
-
-// ==========================================
-// 優先クラス
-// ==========================================
-async function addPriority(){
-  const roomId = document.getElementById('priRoom').value;
-  const dayIdx = Number(document.getElementById('priDay').value);
-  const period = Number(document.getElementById('priPeriod').value);
-  const label  = document.getElementById('priClass').value;
-  try{
-    const res = await api('POST',{action:'setPriority',roomId,dayIdx,period,label});
-    if(!res.ok) throw new Error(res.error);
-    st.priorities = st.priorities.filter(p=>!(p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period));
-    st.priorities.push({roomId,dayIdx,period,label});
-    renderPriList();
-    if(st.roomId===roomId) renderCal();
-  } catch(e){ alert('エラー: '+e.message); }
-}
-
-async function removePriority(roomId,dayIdx,period){
-  try{
-    const res = await api('POST',{action:'setPriority',roomId,dayIdx,period,label:''});
-    if(!res.ok) throw new Error(res.error);
-    st.priorities = st.priorities.filter(p=>!(p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period));
-    renderPriList();
-    if(st.roomId===roomId) renderCal();
-  } catch(e){ alert('エラー: '+e.message); }
-}
-
-function renderPriList(){
-  const ul = document.getElementById('priList');
-  if(!st.priorities.length){ ul.innerHTML='<li style="color:var(--text3);padding:16px 0">登録なし</li>'; return; }
-  const rm = Object.fromEntries(st.rooms.map(r=>[r.id,r.name]));
-  ul.innerHTML='';
-  st.priorities.forEach(p=>{
-    const li=document.createElement('li');
-    li.innerHTML=
-      '<span class="p-room">'+esc(rm[p.roomId]||p.roomId)+'</span>'+
-      '<span class="p-slot">'+DAYS[p.dayIdx]+' · '+p.period+'校時</span>'+
-      '<span class="p-cls">'+esc(p.label)+'</span>'+
-      '<button class="danger" style="margin-left:auto;padding:4px 8px;font-size:12px" onclick="removePriority(\''+p.roomId+'\','+p.dayIdx+','+p.period+')">削除</button>';
-    ul.appendChild(li);
-  });
-}
-
-// ==========================================
-// 週ナビ
-// ==========================================
-function shiftWeek(n){ st.weekStart=addDays(st.weekStart,n*7); loadWeek(); }
-function goToday(){ st.weekStart=mondayOf(new Date()); loadWeek(); }
-async function loadWeek(){
-  try{
-    const d = await api('GET',{action:'weekBookings',monday:ymd(st.weekStart)});
-    if(!d.ok) throw new Error(d.error);
-    const ds=ymd(st.weekStart), de=ymd(addDays(st.weekStart,5));
-    st.bookings = st.bookings.filter(b=>b.date<ds||b.date>=de).concat(d.bookings);
-    renderCal();
-  } catch(e){ alert('通信エラー: '+e.message); }
-}
-
-// ==========================================
-// タブ
-// ==========================================
-function switchTab(t){
-  document.getElementById('calPanel').style.display = t==='cal'?'':'none';
-  document.getElementById('priPanel').classList.toggle('show', t==='pri');
-  document.getElementById('tabCal').classList.toggle('active', t==='cal');
-  document.getElementById('tabPri').classList.toggle('active', t==='pri');
-}
-
-// ==========================================
-// ユーティリティ
-// ==========================================
-function buildLabel(){
-  const g=document.getElementById('gradeSel').value;
-  const c=document.getElementById('classSel').value;
-  return g==='けやき'?'けやき学級':g+'年'+c+'組';
-}
-function parseLabel(label){
-  const g=document.getElementById('gradeSel'), c=document.getElementById('classSel');
-  if(label==='けやき学級'){g.value='けやき';c.value=1;return;}
-  const m=label.match(/^(\d)年(\d)組$/);
-  if(m){g.value=m[1];c.value=m[2];}
-}
-function mondayOf(d){
-  const x=new Date(d);x.setHours(0,0,0,0);
-  const day=x.getDay();x.setDate(x.getDate()+(day===0?-6:1-day));return x;
-}
-function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
-function ymd(d){return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');}
-function getDayIdx(ds){const d=new Date(+ds.slice(0,4),+ds.slice(4,6)-1,+ds.slice(6,8));const day=d.getDay();return day===0?6:day-1;}
-function fmtDT(ts){const d=new Date(ts);return(d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
-function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 </script>
+
 </body>
 </html>
