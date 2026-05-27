@@ -424,7 +424,7 @@ async function saveBooking(){
   const btn = document.getElementById('saveBtn');
   btn.disabled=true; btn.textContent='送信中…';
   try{
-    const res = await api('POST',{action:'saveBooking',roomId:st.roomId,date:activeCell.dateStr,period:activeCell.period,classLabel,teacher});
+    const res = await api('POST',{action:'saveBooking',roomId:st.roomId,dateStr:activeCell.dateStr,period:activeCell.period,classLabel,teacher});
     if(!res.ok) throw new Error(res.error);
     st.bookings = st.bookings.filter(b=>!(b.roomId===st.roomId&&b.date===activeCell.dateStr&&b.period===activeCell.period));
     st.bookings.push({roomId:st.roomId,date:activeCell.dateStr,period:activeCell.period,classLabel,teacher,updatedAt:Date.now()});
@@ -434,12 +434,15 @@ async function saveBooking(){
 }
 
 async function deleteBooking(){
+  // confirmの前にactiveCellをローカルに退避（confirm中にnullになるのを防ぐ）
+  const cell = activeCell;
+  if(!cell) return;
   if(!confirm('この予約を取消しますか？')) return;
   const teacher = document.getElementById('teacherIn').value.trim()||'(不明)';
   try{
-    const res = await api('POST',{action:'deleteBooking',roomId:st.roomId,date:activeCell.dateStr,period:activeCell.period,teacher});
+    const res = await api('POST',{action:'deleteBooking',roomId:st.roomId,dateStr:cell.dateStr,period:cell.period,teacher});
     if(!res.ok) throw new Error(res.error);
-    st.bookings = st.bookings.filter(b=>!(b.roomId===st.roomId&&b.date===activeCell.dateStr&&b.period===activeCell.period));
+    st.bookings = st.bookings.filter(b=>!(b.roomId===st.roomId&&b.date===cell.dateStr&&b.period===cell.period));
     closeModal(); renderCal();
   } catch(e){ alert('エラー: '+e.message); }
 }
