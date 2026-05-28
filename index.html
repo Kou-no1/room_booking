@@ -197,7 +197,6 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbzwdBlpjAUgz1SUNhysy0Vq
   <div class="hdr-sep"></div>
   <button class="tab-btn active" id="tabCal" onclick="switchTab('cal')">週間カレンダー</button>
   <button class="tab-btn" id="tabTt"  onclick="switchTab('tt')">優先時間割</button>
-  <button class="tab-btn" id="tabPri" onclick="switchTab('pri')">優先クラス管理</button>
 </header>
 
 <div class="layout">
@@ -234,30 +233,6 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbzwdBlpjAUgz1SUNhysy0Vq
   </main>
 
   <!-- 優先クラス管理パネル -->
-  <div class="pri-panel" id="priPanel">
-    <div class="card">
-      <p class="card-title">優先クラスを登録</p>
-      <p style="font-size:12px;color:var(--text3);margin-bottom:12px;">年度当初に各教室・曜日・校時の優先クラスを設定します。予約がない枠に薄く表示されます。</p>
-      <div class="form-row">
-        <select id="priRoom" style="min-width:160px"></select>
-        <select id="priDay">
-          <option value="0">月曜</option><option value="1">火曜</option><option value="2">水曜</option>
-          <option value="3">木曜</option><option value="4">金曜</option>
-        </select>
-        <select id="priPeriod">
-          <option value="1">1校時</option><option value="2">2校時</option><option value="3">3校時</option>
-          <option value="4">4校時</option><option value="5">5校時</option><option value="6">6校時</option>
-        </select>
-        <select id="priClass" style="min-width:120px"></select>
-      </div>
-      <button class="primary" onclick="addPriority()">登録する</button>
-    </div>
-    <div class="card" style="padding:0;overflow:hidden">
-      <p style="font-size:12px;color:var(--text3);padding:10px 16px;background:var(--bg2);border-bottom:.5px solid var(--border)">登録済み優先クラス</p>
-      <ul class="pri-list" id="priList" style="padding:0 16px"></ul>
-    </div>
-  </div>
-
   <!-- 優先時間割パネル -->
   <div class="tt-panel" id="ttPanel">
     <!-- 教室ナビ（sticky） -->
@@ -298,6 +273,30 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbzwdBlpjAUgz1SUNhysy0Vq
     </div>
     <div style="margin-top:12px;text-align:right">
       <button onclick="closeModal()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- 優先クラス編集モーダル（優先時間割タブから開く） -->
+<div class="modal-bg" id="ttModalBg" onclick="if(event.target===this)closeTtModal()">
+  <div class="modal" role="dialog" aria-modal="true" style="max-width:420px">
+    <p class="modal-title" id="ttMTitle">優先クラス設定</p>
+    <p class="modal-sub" id="ttMSub"></p>
+    <p style="font-size:12px;color:var(--text3);margin-bottom:10px" id="ttMCap"></p>
+    <!-- 登録済み優先クラス一覧 -->
+    <ul id="ttPriList" style="list-style:none;padding:0;margin-bottom:14px"></ul>
+    <!-- 追加フォーム -->
+    <div id="ttAddForm">
+      <p style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:8px">クラスを追加</p>
+      <div class="form-row">
+        <select id="ttGradeSel"></select>
+        <select id="ttClassSel"></select>
+      </div>
+      <p class="err-msg" id="ttErrMsg" style="display:none">選択してください</p>
+      <button class="primary" onclick="saveTtPriority()">登録する</button>
+    </div>
+    <div style="margin-top:12px;text-align:right">
+      <button onclick="closeTtModal()">閉じる</button>
     </div>
   </div>
 </div>
@@ -360,8 +359,12 @@ window.addEventListener('DOMContentLoaded', async () => {
   [1,2,3].forEach(c=>{ const o=document.createElement('option');o.value=c;o.textContent=c+'組';cs.appendChild(o); });
   const ke=document.createElement('option');ke.value='けやき';ke.textContent='けやき学級';gs.appendChild(ke);
 
-  const pc = document.getElementById('priClass');
-  ALL_CLASSES.forEach(cl=>{ const o=document.createElement('option');o.value=cl;o.textContent=cl;pc.appendChild(o); });
+  // 優先時間割モーダル用セレクト
+  const ttGs = document.getElementById('ttGradeSel');
+  const ttCs = document.getElementById('ttClassSel');
+  [1,2,3,4,5,6].forEach(g=>{ const o=document.createElement('option');o.value=g;o.textContent=g+'年';ttGs.appendChild(o); });
+  [1,2,3].forEach(c=>{ const o=document.createElement('option');o.value=c;o.textContent=c+'組';ttCs.appendChild(o); });
+  const ttKe=document.createElement('option');ttKe.value='けやき';ttKe.textContent='けやき学級';ttGs.appendChild(ttKe);
 
   try {
     const d = await api('GET',{action:'init'});
@@ -652,25 +655,25 @@ function addPriority(){
 }
 
 function removePriority(roomId,dayIdx,period,label){
-  // 楽観的更新: label指定で1件だけ削除
-  const prev = st.priorities.find(p=>p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period&&p.label===label);
-  st.priorities = st.priorities.filter(p=>!(p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period&&p.label===label));
-  renderPriList();
+  // 楽観的更新
+  const prev=st.priorities.find(p=>p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period&&p.label===label);
+  st.priorities=st.priorities.filter(p=>!(p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period&&p.label===label));
+  // カードを再描画
+  const card=document.getElementById('tt-card-'+roomId);
+  if(card){const r=st.rooms.find(x=>x.id===roomId);if(r)card.innerHTML=buildTtCard(r);}
   if(st.roomId===roomId) renderCal();
 
-  // バックグラウンドでGASに保存
   api('POST',{action:'deletePriority',roomId,dayIdx,period,label})
     .then(res=>{
       if(!res.ok){
         if(prev) st.priorities.push(prev);
-        renderPriList();
+        const card2=document.getElementById('tt-card-'+roomId);
+        if(card2){const r2=st.rooms.find(x=>x.id===roomId);if(r2)card2.innerHTML=buildTtCard(r2);}
         if(st.roomId===roomId) renderCal();
-        showToast('削除に失敗しました: '+res.error, true);
-      } else {
-        showToast('優先クラスを削除しました');
-      }
+        showToast('削除に失敗しました: '+res.error,true);
+      } else { showToast('優先クラスを削除しました'); }
     })
-    .catch(e=>showToast('通信エラー: '+e.message, true));
+    .catch(e=>showToast('通信エラー: '+e.message,true));
 }
 
 // トースト通知
@@ -732,122 +735,190 @@ async function loadWeek(){
 // ==========================================
 function switchTab(t){
   document.getElementById('calPanel').style.display = t==='cal'?'':'none';
-  document.getElementById('priPanel').classList.toggle('show', t==='pri');
   document.getElementById('ttPanel').classList.toggle('show', t==='tt');
   document.getElementById('tabCal').classList.toggle('active', t==='cal');
-  document.getElementById('tabPri').classList.toggle('active', t==='pri');
   document.getElementById('tabTt').classList.toggle('active', t==='tt');
   if(t==='tt') renderTimetable();
 }
 
 // ==========================================
-// 優先時間割
+// 優先時間割（セルから直接登録・削除）
 // ==========================================
+const DAYS_TT    = ['月','火','水','木','金'];
+const PERIODS_TT = [1,2,3,4,5,6];
+let activeTtCell = null; // {roomId, roomName, dayIdx, period, cap}
+
 function renderTimetable(){
   const nav  = document.getElementById('ttNav');
   const grid = document.getElementById('ttGrid');
   nav.innerHTML=''; grid.innerHTML='';
 
-  const DAYS_TT   = ['月','火','水','木','金'];
-  const PERIODS_TT = [1,2,3,4,5,6];
-
-  // 優先クラスが1件でも登録されている教室だけ先頭に、残りは後ろ
-  const withPri  = st.rooms.filter(r => st.priorities.some(p=>p.roomId===r.id));
-  const withoutPri = st.rooms.filter(r => !st.priorities.some(p=>p.roomId===r.id));
-  const orderedRooms = [...withPri, ...withoutPri];
+  const withPri    = st.rooms.filter(r=>st.priorities.some(p=>p.roomId===r.id));
+  const withoutPri = st.rooms.filter(r=>!st.priorities.some(p=>p.roomId===r.id));
+  const orderedRooms = [...withPri,...withoutPri];
 
   orderedRooms.forEach(room=>{
-    // ── ナビボタン ──
+    // ナビボタン
     const navBtn = document.createElement('button');
-    navBtn.className = 'tt-nav-btn';
-    navBtn.textContent = room.name;
-    navBtn.dataset.roomId = room.id;
-    navBtn.onclick = ()=>scrollToCard(room.id);
+    navBtn.className='tt-nav-btn'; navBtn.textContent=room.name; navBtn.dataset.roomId=room.id;
+    navBtn.onclick=()=>scrollToCard(room.id);
     nav.appendChild(navBtn);
 
-    // ── カード ──
+    // カード（テーブルをJSで組む）
     const card = document.createElement('div');
-    card.className = 'tt-card';
-    card.id = 'tt-card-'+room.id;
-
-    // 優先クラスマップ: dayIdx_period → [label, ...]
-    const priMap = {};
-    st.priorities.filter(p=>p.roomId===room.id).forEach(p=>{
-      const k = p.dayIdx+'_'+p.period;
-      if(!priMap[k]) priMap[k]=[];
-      priMap[k].push(p.label);
-    });
-
-    const hasPri = Object.keys(priMap).length > 0;
-
-    // ヘッダー
-    let hdrHtml =
-      '<div class="tt-card-hdr">'+
-      '<i class="ti ti-building" style="font-size:15px;color:var(--text3)" aria-hidden="true"></i>'+
-      '<span class="tt-card-name">'+esc(room.name)+'</span>';
-    if(room.capacity>1) hdrHtml += '<span class="tt-card-cap">定員 '+room.capacity+' クラス</span>';
-    hdrHtml += '</div>';
-
-    // テーブル
-    let tblHtml = '<div style="overflow-x:auto"><table class="tt-tbl">';
-    tblHtml += '<thead><tr><th class="tt-per"></th>';
-    DAYS_TT.forEach(d=>{ tblHtml+='<th>'+d+'</th>'; });
-    tblHtml += '</tr></thead><tbody>';
-
-    if(!hasPri){
-      tblHtml += '<tr><td colspan="6" class="tt-no-data">優先クラス未登録</td></tr>';
-    } else {
-      PERIODS_TT.forEach(p=>{
-        tblHtml += '<tr><td class="tt-per">'+p+'時限</td>';
-        for(let d=0;d<5;d++){
-          const k=d+'_'+p;
-          const labels=priMap[k];
-          if(labels&&labels.length>0){
-            tblHtml += '<td>'+labels.map(l=>'<span class="tt-badge">'+esc(l)+'</span>').join('<br>')+'</td>';
-          } else {
-            tblHtml += '<td><span class="tt-empty">—</span></td>';
-          }
-        }
-        tblHtml += '</tr>';
-      });
-    }
-    tblHtml += '</tbody></table></div>';
-
-    card.innerHTML = hdrHtml + tblHtml;
+    card.className='tt-card'; card.id='tt-card-'+room.id;
+    card.innerHTML = buildTtCard(room);
     grid.appendChild(card);
   });
 
-  // IntersectionObserver でスクロール位置に合わせてナビをハイライト
   setupTtObserver();
 }
 
-function scrollToCard(roomId){
-  const card = document.getElementById('tt-card-'+roomId);
-  if(!card) return;
-  // sticky ヘッダー(52px) + ナビ(約56px) 分オフセット
-  const top = card.getBoundingClientRect().top + window.scrollY - 120;
-  window.scrollTo({top, behavior:'smooth'});
-  // ナビボタンのアクティブを即時更新
-  setNavActive(roomId);
+function buildTtCard(room){
+  const priMap={};
+  st.priorities.filter(p=>p.roomId===room.id).forEach(p=>{
+    const k=p.dayIdx+'_'+p.period;
+    if(!priMap[k]) priMap[k]=[];
+    priMap[k].push(p.label);
+  });
+
+  let html =
+    '<div class="tt-card-hdr">'+
+    '<i class="ti ti-building" style="font-size:15px;color:var(--text3)" aria-hidden="true"></i>'+
+    '<span class="tt-card-name">'+esc(room.name)+'</span>'+
+    (room.capacity>1?'<span class="tt-card-cap">定員 '+room.capacity+' クラス</span>':'')+
+    '</div>'+
+    '<div style="overflow-x:auto"><table class="tt-tbl">'+
+    '<thead><tr><th class="tt-per"></th>';
+  DAYS_TT.forEach(d=>{ html+='<th>'+d+'</th>'; });
+  html+='</tr></thead><tbody>';
+
+  PERIODS_TT.forEach(p=>{
+    html+='<tr><td class="tt-per">'+p+'時限</td>';
+    for(let d=0;d<5;d++){
+      const k=d+'_'+p;
+      const labels=priMap[k]||[];
+      const isFull = labels.length>=room.capacity;
+      // クリックで編集モーダルを開く
+      html+='<td style="cursor:pointer;transition:background .1s" onclick="openTtModal(''+room.id+'',''+esc(room.name)+'','+d+','+p+','+room.capacity+')">';
+      if(labels.length>0){
+        labels.forEach(l=>{
+          html+='<span class="tt-badge" style="display:block;margin:1px 0">'+esc(l)+'</span>';
+        });
+        if(!isFull) html+='<span style="font-size:10px;color:var(--p600);display:block;margin-top:2px">＋追加</span>';
+      } else {
+        html+='<span class="tt-empty" style="font-size:16px">+</span>';
+      }
+      html+='</td>';
+    }
+    html+='</tr>';
+  });
+  html+='</tbody></table></div>';
+  return html;
 }
 
-function setNavActive(roomId){
-  document.querySelectorAll('.tt-nav-btn').forEach(b=>{
-    b.classList.toggle('active', b.dataset.roomId===roomId);
+// 優先クラス編集モーダルを開く
+function openTtModal(roomId,roomName,dayIdx,period,cap){
+  activeTtCell={roomId,roomName,dayIdx,period,cap};
+  document.getElementById('ttMTitle').textContent=roomName+' · '+period+'校時';
+  document.getElementById('ttMSub').textContent=DAYS_TT[dayIdx]+'曜日';
+  document.getElementById('ttErrMsg').style.display='none';
+  document.getElementById('ttGradeSel').value=1;
+  document.getElementById('ttClassSel').value=1;
+  renderTtPriList();
+  document.getElementById('ttModalBg').classList.add('show');
+}
+function closeTtModal(){
+  document.getElementById('ttModalBg').classList.remove('show');
+  activeTtCell=null;
+}
+
+function renderTtPriList(){
+  const c=activeTtCell; if(!c) return;
+  const ul=document.getElementById('ttPriList');
+  const current=st.priorities.filter(p=>p.roomId===c.roomId&&p.dayIdx===c.dayIdx&&p.period===c.period);
+  const isFull=current.length>=c.cap;
+  document.getElementById('ttMCap').textContent='定員 '+c.cap+' クラス　現在 '+current.length+' クラス登録中';
+  document.getElementById('ttAddForm').style.display=isFull?'none':'';
+  ul.innerHTML='';
+  if(!current.length){
+    ul.innerHTML='<li style="color:var(--text3);font-size:12px;padding:4px 0">登録なし</li>';
+    return;
+  }
+  current.forEach(p=>{
+    const li=document.createElement('li');
+    li.style.cssText='display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:.5px solid var(--border);font-size:13px';
+    li.innerHTML=
+      '<span style="font-weight:500;flex:1">'+esc(p.label)+'</span>'+
+      '<button class="danger" style="padding:3px 10px;font-size:12px" onclick="ttRemovePriority(''+esc(p.roomId)+'','+p.dayIdx+','+p.period+',''+esc(p.label)+'')">削除</button>';
+    ul.appendChild(li);
   });
 }
 
-let ttObserver = null;
+function saveTtPriority(){
+  const c=activeTtCell; if(!c) return;
+  const g=document.getElementById('ttGradeSel').value;
+  const cl=document.getElementById('ttClassSel').value;
+  const label=g==='けやき'?'けやき学級':g+'年'+cl+'組';
+  // 重複チェック
+  if(st.priorities.find(p=>p.roomId===c.roomId&&p.dayIdx===c.dayIdx&&p.period===c.period&&p.label===label)){
+    document.getElementById('ttErrMsg').textContent='同じクラスが既に登録されています';
+    document.getElementById('ttErrMsg').style.display='';
+    return;
+  }
+  addPriorityDirect(c.roomId,c.dayIdx,c.period,label);
+}
+
+function ttRemovePriority(roomId,dayIdx,period,label){
+  removePriority(roomId,dayIdx,period,label);
+  // モーダルが開いていれば更新
+  if(activeTtCell&&activeTtCell.roomId===roomId&&activeTtCell.dayIdx===dayIdx&&activeTtCell.period===period){
+    renderTtPriList();
+  }
+}
+
+// addPriorityの共通ロジック（直接呼び出し用）
+function addPriorityDirect(roomId,dayIdx,period,label){
+  const room=st.rooms.find(r=>r.id===roomId);
+  const cap=room?room.capacity:1;
+  const current=st.priorities.filter(p=>p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period);
+  if(current.length>=cap){ showToast('定員（'+cap+'クラス）に達しています',true); return; }
+  // 楽観的更新
+  st.priorities.push({roomId,dayIdx,period,label});
+  renderTtPriList();
+  // カードだけ再描画（全体renderTimetableは重いので対象カードのみ）
+  const card=document.getElementById('tt-card-'+roomId);
+  if(card){ const r=st.rooms.find(x=>x.id===roomId); if(r) card.innerHTML=buildTtCard(r); }
+  if(st.roomId===roomId) renderCal();
+  // API保存
+  api('POST',{action:'setPriority',roomId,dayIdx,period,label})
+    .then(res=>{
+      if(!res.ok){
+        st.priorities=st.priorities.filter(p=>!(p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period&&p.label===label));
+        renderTtPriList();
+        const card2=document.getElementById('tt-card-'+roomId);
+        if(card2){const r2=st.rooms.find(x=>x.id===roomId);if(r2)card2.innerHTML=buildTtCard(r2);}
+        showToast('保存に失敗しました: '+res.error,true);
+      } else { showToast('優先クラスを登録しました'); }
+    })
+    .catch(e=>showToast('通信エラー: '+e.message,true));
+}
+
+function scrollToCard(roomId){
+  const card=document.getElementById('tt-card-'+roomId); if(!card) return;
+  const top=card.getBoundingClientRect().top+window.scrollY-120;
+  window.scrollTo({top,behavior:'smooth'});
+  setNavActive(roomId);
+}
+function setNavActive(roomId){
+  document.querySelectorAll('.tt-nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.roomId===roomId));
+}
+let ttObserver=null;
 function setupTtObserver(){
   if(ttObserver) ttObserver.disconnect();
-  ttObserver = new IntersectionObserver(entries=>{
-    entries.forEach(entry=>{
-      if(entry.isIntersecting){
-        const roomId = entry.target.id.replace('tt-card-','');
-        setNavActive(roomId);
-      }
-    });
-  },{rootMargin:'-120px 0px -60% 0px', threshold:0});
+  ttObserver=new IntersectionObserver(entries=>{
+    entries.forEach(entry=>{ if(entry.isIntersecting) setNavActive(entry.target.id.replace('tt-card-','')); });
+  },{rootMargin:'-120px 0px -60% 0px',threshold:0});
   document.querySelectorAll('.tt-card').forEach(c=>ttObserver.observe(c));
 }
 
