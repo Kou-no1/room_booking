@@ -373,9 +373,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     st.priorities = d.priorities;
     st.bookings   = d.bookings;
     buildRoomList();
-    buildPriRoomSel();
     if(st.rooms.length) selectRoom(st.rooms[0].id);
-    renderPriList();
   } catch(e) {
     document.getElementById('grid').innerHTML = '<div class="loading">読み込みエラー: '+esc(e.message)+'</div>';
   }
@@ -401,11 +399,6 @@ function selectRoom(id){
   document.getElementById('roomName').textContent = r ? r.name : '';
   renderCal();
 }
-function buildPriRoomSel(){
-  const s = document.getElementById('priRoom'); s.innerHTML='';
-  st.rooms.forEach(r=>{ const o=document.createElement('option');o.value=r.id;o.textContent=r.name;s.appendChild(o); });
-}
-
 // ==========================================
 // カレンダー描画
 // ==========================================
@@ -618,42 +611,6 @@ function getBks(roomId, dateStr, period){
 // ==========================================
 // 優先クラス
 // ==========================================
-function addPriority(){
-  const roomId = document.getElementById('priRoom').value;
-  const dayIdx = Number(document.getElementById('priDay').value);
-  const period = Number(document.getElementById('priPeriod').value);
-  const label  = document.getElementById('priClass').value;
-
-  // 重複チェック: 同じ教室×曜日×校時×クラスが既にあれば何もしない
-  const dup = st.priorities.find(p=>p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period&&p.label===label);
-  if(dup){ showToast('同じクラスが既に登録されています', true); return; }
-
-  // 定員チェック
-  const room = st.rooms.find(r=>r.id===roomId);
-  const cap = room ? room.capacity : 1;
-  const current = st.priorities.filter(p=>p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period);
-  if(current.length >= cap){ showToast('定員（'+cap+'クラス）に達しています', true); return; }
-
-  // 楽観的更新: 即座に追加
-  st.priorities.push({roomId,dayIdx,period,label});
-  renderPriList();
-  if(st.roomId===roomId) renderCal();
-
-  // バックグラウンドでGASに保存
-  api('POST',{action:'setPriority',roomId,dayIdx,period,label})
-    .then(res=>{
-      if(!res.ok){
-        st.priorities = st.priorities.filter(p=>!(p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period&&p.label===label));
-        renderPriList();
-        if(st.roomId===roomId) renderCal();
-        showToast('保存に失敗しました: '+res.error, true);
-      } else {
-        showToast('優先クラスを登録しました');
-      }
-    })
-    .catch(e=>showToast('通信エラー: '+e.message, true));
-}
-
 function removePriority(roomId,dayIdx,period,label){
   // 楽観的更新
   const prev=st.priorities.find(p=>p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period&&p.label===label);
@@ -697,22 +654,6 @@ function showToast(msg, isError=false){
   t.style.opacity = '1';
   if(toastTimer) clearTimeout(toastTimer);
   toastTimer = setTimeout(()=>{ t.style.opacity='0'; }, 2500);
-}
-
-function renderPriList(){
-  const ul = document.getElementById('priList');
-  if(!st.priorities.length){ ul.innerHTML='<li style="color:var(--text3);padding:16px 0">登録なし</li>'; return; }
-  const rm = Object.fromEntries(st.rooms.map(r=>[r.id,r.name]));
-  ul.innerHTML='';
-  st.priorities.forEach(p=>{
-    const li=document.createElement('li');
-    li.innerHTML=
-      '<span class="p-room">'+esc(rm[p.roomId]||p.roomId)+'</span>'+
-      '<span class="p-slot">'+DAYS[p.dayIdx]+' · '+p.period+'校時</span>'+
-      '<span class="p-cls">'+esc(p.label)+'</span>'+
-      '<button class="danger" style="margin-left:auto;padding:4px 8px;font-size:12px" onclick="removePriority(\''+p.roomId+'\','+p.dayIdx+','+p.period+',\''+p.label+'\')" >削除</button>';
-    ul.appendChild(li);
-  });
 }
 
 // ==========================================
