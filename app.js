@@ -90,7 +90,16 @@ function buildRoomList(){
   st.rooms.forEach(r=>{
     const b = document.createElement('button');
     b.className='room-btn'; b.textContent=r.name; b.dataset.id=r.id;
-    b.onclick=()=>selectRoom(r.id);
+    b.onclick=()=>{
+      const ttPanel = document.getElementById('ttPanel');
+      if(ttPanel.classList.contains('show')){
+        // 優先時間割タブ: サイドバーからスクロール
+        document.querySelectorAll('.room-btn').forEach(x=>x.classList.toggle('active',x.dataset.id===r.id));
+        scrollToCard(r.id);
+      } else {
+        selectRoom(r.id);
+      }
+    };
     el.appendChild(b);
   });
 }
@@ -392,26 +401,17 @@ const PERIODS_TT = [1,2,3,4,5,6];
 let activeTtCell = null; // {roomId, roomName, dayIdx, period, cap}
 
 function renderTimetable(){
-  const nav  = document.getElementById('ttNav');
   const grid = document.getElementById('ttGrid');
-  nav.innerHTML=''; grid.innerHTML='';
+  grid.innerHTML='';
 
   const withPri    = st.rooms.filter(r=>st.priorities.some(p=>p.roomId===r.id));
   const withoutPri = st.rooms.filter(r=>!st.priorities.some(p=>p.roomId===r.id));
   const orderedRooms = [...withPri,...withoutPri];
 
   orderedRooms.forEach(room=>{
-    // ナビボタン
-    const navBtn = document.createElement('button');
-    navBtn.className='tt-nav-btn'; navBtn.textContent=room.name; navBtn.dataset.roomId=room.id;
-    navBtn.onclick=()=>scrollToCard(room.id);
-    nav.appendChild(navBtn);
-
-    // カード（テーブルをJSで組む）
     const card = document.createElement('div');
     card.className='tt-card'; card.id='tt-card-'+room.id;
     card.innerHTML = buildTtCard(room);
-    // tt-cellのクリックをイベント委譲で処理
     card.addEventListener('click', function(e){
       const td = e.target.closest('.tt-cell');
       if(!td) return;
@@ -420,6 +420,8 @@ function renderTimetable(){
     grid.appendChild(card);
   });
 
+  // サイドバーのアクティブを最初の教室に
+  if(orderedRooms.length) setNavActive(orderedRooms[0].id);
   setupTtObserver();
 }
 
@@ -560,12 +562,13 @@ function addPriorityDirect(roomId,dayIdx,period,label){
 
 function scrollToCard(roomId){
   const card=document.getElementById('tt-card-'+roomId); if(!card) return;
-  const top=card.getBoundingClientRect().top+window.scrollY-120;
+  const top=card.getBoundingClientRect().top+window.scrollY-68;
   window.scrollTo({top,behavior:'smooth'});
   setNavActive(roomId);
 }
 function setNavActive(roomId){
-  document.querySelectorAll('.tt-nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.roomId===roomId));
+  // サイドバーのroom-btnをアクティブに
+  document.querySelectorAll('.room-btn').forEach(b=>b.classList.toggle('active',b.dataset.id===roomId));
 }
 let ttObserver=null;
 function setupTtObserver(){
