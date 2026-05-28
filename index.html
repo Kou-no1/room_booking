@@ -33,7 +33,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Hiragino Kaku
 .layout{display:flex;gap:16px;max-width:1200px;margin:0 auto;padding:16px;align-items:flex-start}
 
 /* サイドバー */
-.sidebar{width:160px;flex-shrink:0;background:var(--bg);border:.5px solid var(--border);border-radius:var(--rl);overflow:hidden}
+.sidebar{width:160px;flex-shrink:0;background:var(--bg);border:.5px solid var(--border);border-radius:var(--rl);overflow:hidden;position:sticky;top:68px;max-height:calc(100vh - 84px);overflow-y:auto}
 .sb-title{padding:10px 12px;font-size:11px;font-weight:500;color:var(--text3);letter-spacing:.05em;border-bottom:.5px solid var(--border);background:var(--bg2)}
 .room-btn{display:block;width:100%;padding:10px 12px;font-size:13px;color:var(--text2);background:transparent;border:none;border-bottom:.5px solid var(--border);cursor:pointer;text-align:left;font-family:inherit;transition:background .1s}
 .room-btn:last-child{border-bottom:none}
@@ -235,8 +235,6 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbzwdBlpjAUgz1SUNhysy0Vq
   <!-- 優先クラス管理パネル -->
   <!-- 優先時間割パネル -->
   <div class="tt-panel" id="ttPanel">
-    <!-- 教室ナビ（sticky） -->
-    <div class="tt-nav" id="ttNav"></div>
     <!-- カードグリッド -->
     <div class="tt-grid" id="ttGrid">
       <div class="loading">読み込み中...</div>
