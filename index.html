@@ -366,16 +366,22 @@ window.addEventListener('DOMContentLoaded', async () => {
   [1,2,3].forEach(c=>{ const o=document.createElement('option');o.value=c;o.textContent=c+'組';ttCs.appendChild(o); });
   const ttKe=document.createElement('option');ttKe.value='けやき';ttKe.textContent='けやき学級';ttGs.appendChild(ttKe);
 
+  // セレクト初期化が失敗していないか確認
+  if(!document.getElementById('ttGradeSel')){
+    document.getElementById('grid').innerHTML='<div class="loading">エラー: ttGradeSel が見つかりません</div>'; return;
+  }
   try {
     const d = await api('GET',{action:'init'});
-    if(!d.ok) throw new Error(d.error);
-    st.rooms      = d.rooms;
-    st.priorities = d.priorities;
-    st.bookings   = d.bookings;
+    if(!d.ok) throw new Error('APIエラー: '+d.error);
+    st.rooms      = d.rooms      || [];
+    st.priorities = d.priorities || [];
+    st.bookings   = d.bookings   || [];
     buildRoomList();
     if(st.rooms.length) selectRoom(st.rooms[0].id);
+    else document.getElementById('grid').innerHTML='<div class="loading">教室マスタが空です。スプレッドシートを確認してください。</div>';
   } catch(e) {
-    document.getElementById('grid').innerHTML = '<div class="loading">読み込みエラー: '+esc(e.message)+'</div>';
+    document.getElementById('grid').innerHTML = '<div class="loading" style="color:#e24b4a">読み込みエラー: '+esc(e.message)+'</div>';
+    console.error('init error:', e);
   }
 });
 
@@ -709,6 +715,12 @@ function renderTimetable(){
     const card = document.createElement('div');
     card.className='tt-card'; card.id='tt-card-'+room.id;
     card.innerHTML = buildTtCard(room);
+    // tt-cellのクリックをイベント委譲で処理
+    card.addEventListener('click', function(e){
+      const td = e.target.closest('.tt-cell');
+      if(!td) return;
+      openTtModal(td.dataset.roomId, td.dataset.roomName, Number(td.dataset.day), Number(td.dataset.period), Number(td.dataset.cap));
+    });
     grid.appendChild(card);
   });
 
@@ -741,7 +753,7 @@ function buildTtCard(room){
       const labels=priMap[k]||[];
       const isFull = labels.length>=room.capacity;
       // クリックで編集モーダルを開く
-      html+='<td style="cursor:pointer;transition:background .1s" onclick="openTtModal(''+room.id+'',''+esc(room.name)+'','+d+','+p+','+room.capacity+')">';
+      html+='<td class="tt-cell" style="cursor:pointer;transition:background .1s" data-room-id="'+room.id+'" data-room-name="'+esc(room.name)+'" data-day="'+d+'" data-period="'+p+'" data-cap="'+room.capacity+'">';
       if(labels.length>0){
         labels.forEach(l=>{
           html+='<span class="tt-badge" style="display:block;margin:1px 0">'+esc(l)+'</span>';
