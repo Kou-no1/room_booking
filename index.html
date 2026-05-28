@@ -446,6 +446,11 @@ function mkCell(dateStr, period, bks, pris){
   if(bks.length > 0){
     btn.classList.add('booked');
     let html = '';
+    // 優先クラスをセル上部にアンバー色で表示（予約があっても消えない）
+    if(pris.length > 0){
+      const priLabels = pris.map(pr=>esc(pr.label)).join('・');
+      html += '<span style="display:block;font-size:10px;color:#854f0b;background:#faeeda;border-radius:3px;padding:1px 4px;margin-bottom:3px;line-height:1.3">優先 '+priLabels+'</span>';
+    }
     bks.forEach(bk => {
       const ts = bk.updatedAt ? fmtDT(bk.updatedAt)+' · '+esc(bk.teacher) : esc(bk.teacher);
       html += '<span class="cell-cls" data-tip="最終更新 '+ts+'" style="display:block">'+esc(bk.classLabel)+'</span>';
