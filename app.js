@@ -238,6 +238,7 @@ function renderBookingList(bks){
     db.addEventListener('click',()=>doDelete(bk.id));
     li.appendChild(ns); li.appendChild(ts); li.appendChild(db); ul.appendChild(li);
   });
+}
 
 function closeModal(){ document.getElementById('modalBg').classList.remove('show'); activeCell=null; }
 
@@ -506,6 +507,7 @@ function renderTtPriList(){
     db.addEventListener('click',()=>ttRemovePriority(p.roomId,p.dayIdx,p.period,p.label));
     li.appendChild(ns); li.appendChild(db); ul.appendChild(li);
   });
+}
 
 function saveTtPriority(){
   const c=activeTtCell; if(!c) return;
