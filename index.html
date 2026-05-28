@@ -616,9 +616,17 @@ function addPriority(){
   const period = Number(document.getElementById('priPeriod').value);
   const label  = document.getElementById('priClass').value;
 
-  // 楽観的更新: 即座に画面反映
-  const prev = st.priorities.filter(p=>p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period);
-  st.priorities = st.priorities.filter(p=>!(p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period));
+  // 重複チェック: 同じ教室×曜日×校時×クラスが既にあれば何もしない
+  const dup = st.priorities.find(p=>p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period&&p.label===label);
+  if(dup){ showToast('同じクラスが既に登録されています', true); return; }
+
+  // 定員チェック
+  const room = st.rooms.find(r=>r.id===roomId);
+  const cap = room ? room.capacity : 1;
+  const current = st.priorities.filter(p=>p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period);
+  if(current.length >= cap){ showToast('定員（'+cap+'クラス）に達しています', true); return; }
+
+  // 楽観的更新: 即座に追加
   st.priorities.push({roomId,dayIdx,period,label});
   renderPriList();
   if(st.roomId===roomId) renderCal();
@@ -627,9 +635,7 @@ function addPriority(){
   api('POST',{action:'setPriority',roomId,dayIdx,period,label})
     .then(res=>{
       if(!res.ok){
-        // 失敗したらロールバック
-        st.priorities = st.priorities.filter(p=>!(p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period));
-        prev.forEach(p=>st.priorities.push(p));
+        st.priorities = st.priorities.filter(p=>!(p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period&&p.label===label));
         renderPriList();
         if(st.roomId===roomId) renderCal();
         showToast('保存に失敗しました: '+res.error, true);
@@ -640,19 +646,18 @@ function addPriority(){
     .catch(e=>showToast('通信エラー: '+e.message, true));
 }
 
-function removePriority(roomId,dayIdx,period){
-  // 楽観的更新: 即座に削除
-  const prev = st.priorities.filter(p=>p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period);
-  st.priorities = st.priorities.filter(p=>!(p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period));
+function removePriority(roomId,dayIdx,period,label){
+  // 楽観的更新: label指定で1件だけ削除
+  const prev = st.priorities.find(p=>p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period&&p.label===label);
+  st.priorities = st.priorities.filter(p=>!(p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period&&p.label===label));
   renderPriList();
   if(st.roomId===roomId) renderCal();
 
   // バックグラウンドでGASに保存
-  api('POST',{action:'setPriority',roomId,dayIdx,period,label:''})
+  api('POST',{action:'deletePriority',roomId,dayIdx,period,label})
     .then(res=>{
       if(!res.ok){
-        // 失敗したらロールバック
-        prev.forEach(p=>st.priorities.push(p));
+        if(prev) st.priorities.push(prev);
         renderPriList();
         if(st.roomId===roomId) renderCal();
         showToast('削除に失敗しました: '+res.error, true);
@@ -697,7 +702,7 @@ function renderPriList(){
       '<span class="p-room">'+esc(rm[p.roomId]||p.roomId)+'</span>'+
       '<span class="p-slot">'+DAYS[p.dayIdx]+' · '+p.period+'校時</span>'+
       '<span class="p-cls">'+esc(p.label)+'</span>'+
-      '<button class="danger" style="margin-left:auto;padding:4px 8px;font-size:12px" onclick="removePriority(\''+p.roomId+'\','+p.dayIdx+','+p.period+')">削除</button>';
+      '<button class="danger" style="margin-left:auto;padding:4px 8px;font-size:12px" onclick="removePriority(\''+p.roomId+'\','+p.dayIdx+','+p.period+',\''+p.label+'\')" >削除</button>';
     ul.appendChild(li);
   });
 }
