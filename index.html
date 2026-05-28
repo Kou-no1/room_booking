@@ -197,21 +197,30 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbzwdBlpjAUgz1SUNhysy0Vq
 
 <!-- 予約モーダル -->
 <div class="modal-bg" id="modalBg" onclick="if(event.target===this)closeModal()">
-  <div class="modal" role="dialog" aria-modal="true">
+  <div class="modal" role="dialog" aria-modal="true" style="max-width:440px">
     <p class="modal-title" id="mTitle">予約</p>
     <p class="modal-sub" id="mSub"></p>
     <div class="pri-hint" id="mHint"></div>
-    <div class="form-row">
-      <select id="gradeSel"></select>
-      <select id="classSel"></select>
-      <input type="text" id="teacherIn" placeholder="担任名（必須）">
+    <!-- 定員情報 -->
+    <p id="capInfo" style="font-size:12px;color:var(--text3);margin-bottom:8px"></p>
+    <!-- 既存予約リスト -->
+    <ul id="bookingList" style="list-style:none;margin-bottom:12px;padding:0"></ul>
+    <!-- 追加フォーム -->
+    <div id="addForm">
+      <p style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:8px">クラスを追加予約</p>
+      <div class="form-row">
+        <select id="gradeSel"></select>
+        <select id="classSel"></select>
+        <input type="text" id="teacherIn" placeholder="担任名（必須）">
+      </div>
+      <p class="err-msg" id="errMsg">担任名を入力してください</p>
+      <p class="last-edit" id="lastEdit"></p>
+      <div class="btn-row">
+        <button class="primary" id="saveBtn" onclick="saveBooking()">予約する</button>
+      </div>
     </div>
-    <p class="err-msg" id="errMsg">担任名を入力してください</p>
-    <p class="last-edit" id="lastEdit"></p>
-    <div class="btn-row">
-      <button class="primary" id="saveBtn" onclick="saveBooking()">予約する</button>
-      <button class="danger" id="delBtn" onclick="deleteBooking()" style="display:none">取消</button>
-      <button onclick="closeModal()" style="margin-left:auto">閉じる</button>
+    <div style="margin-top:12px;text-align:right">
+      <button onclick="closeModal()">閉じる</button>
     </div>
   </div>
 </div>
@@ -343,23 +352,39 @@ function renderCal(){
     DAYS.forEach((_,i)=>{
       const dt  = addDays(st.weekStart,i);
       const ds  = ymd(dt);
-      const bk  = st.bookings.find(b=>b.roomId===st.roomId&&b.date===ds&&b.period===p);
+      const bks = st.bookings.filter(b=>b.roomId===st.roomId&&b.date===ds&&b.period===p);
       const pri = st.priorities.find(pr=>pr.roomId===st.roomId&&pr.dayIdx===i&&pr.period===p);
-      grid.appendChild(mkCell(ds, p, bk, pri));
+      grid.appendChild(mkCell(ds, p, bks, pri));
     });
   });
 }
 
-function mkCell(dateStr, period, bk, pri){
+function mkCell(dateStr, period, bks, pri){
+  // bks = この枠の予約配列（複数クラス対応）
   const btn = document.createElement('button');
   btn.className = 'g-cell';
-  if(bk){
+  const room = st.rooms.find(x=>x.id===st.roomId);
+  const cap = room ? room.capacity : 1;
+
+  if(bks.length > 0){
     btn.classList.add('booked');
-    btn.innerHTML =
-      '<span class="cell-cls">'+esc(bk.classLabel)+'</span>'+
-      (bk.teacher?'<span class="cell-tchr">'+esc(bk.teacher)+'</span>':'');
-    const ts = bk.updatedAt ? fmtDT(bk.updatedAt)+' · '+esc(bk.teacher) : esc(bk.teacher);
-    btn.dataset.tip = '最終更新 '+ts;
+    // 複数クラスを縦に並べる
+    let html = '';
+    bks.forEach(bk => {
+      const ts = bk.updatedAt ? fmtDT(bk.updatedAt)+' · '+esc(bk.teacher) : esc(bk.teacher);
+      html += '<span class="cell-cls" data-tip="最終更新 '+ts+'" style="display:block">'+esc(bk.classLabel)+'</span>';
+      if(bk.teacher) html += '<span class="cell-tchr" style="display:block">'+esc(bk.teacher)+'</span>';
+    });
+    // 定員に空きがあれば＋ボタンも表示
+    if(bks.length < cap){
+      html += '<span style="font-size:11px;color:var(--p600);margin-top:2px;display:block">＋追加</span>';
+    }
+    btn.innerHTML = html;
+    // ツールチップは最初のクラスに付ける
+    const firstTs = bks[0].updatedAt ? fmtDT(bks[0].updatedAt)+' · '+esc(bks[0].teacher) : esc(bks[0].teacher);
+    btn.dataset.tip = bks.length > 1
+      ? bks.map(b=>esc(b.classLabel)).join(' / ')
+      : '最終更新 '+firstTs;
     btn.addEventListener('mouseenter', showTip);
     btn.addEventListener('mousemove',  moveTip);
     btn.addEventListener('mouseleave', hideTip);
@@ -369,7 +394,7 @@ function mkCell(dateStr, period, bk, pri){
   } else {
     btn.classList.add('empty'); btn.textContent='+';
   }
-  btn.onclick = ()=>openModal(dateStr,period,bk,pri);
+  btn.onclick = ()=>openModal(dateStr, period, bks, pri);
   return btn;
 }
 
@@ -382,11 +407,12 @@ function moveTip(e){ tipEl.style.left=(e.clientX+14)+'px'; tipEl.style.top=(e.cl
 function hideTip(){ tipEl.classList.remove('show'); }
 
 // ==========================================
-// モーダル
+// モーダル（複数クラス対応）
 // ==========================================
-function openModal(dateStr, period, bk, pri){
-  activeCell = {dateStr, period};
+function openModal(dateStr, period, bks, pri){
+  activeCell = {dateStr, period, bks};
   const r = st.rooms.find(x=>x.id===st.roomId);
+  const cap = r ? r.capacity : 1;
   document.getElementById('mTitle').textContent = (r?r.name:'') + ' · ' + period + '校時';
   document.getElementById('mSub').textContent =
     dateStr.slice(0,4)+'/'+dateStr.slice(4,6)+'/'+dateStr.slice(6,8)+
@@ -397,24 +423,43 @@ function openModal(dateStr, period, bk, pri){
   if(pri){ hint.style.display=''; hint.textContent='⚠ この枠の優先クラスは「'+esc(pri.label)+'」です'; }
   else hint.style.display='none';
 
-  if(bk){
-    parseLabel(bk.classLabel);
-    document.getElementById('teacherIn').value = bk.teacher||'';
-    document.getElementById('delBtn').style.display='';
-    document.getElementById('saveBtn').textContent='更新する';
-    const le = document.getElementById('lastEdit');
-    if(bk.updatedAt){ le.style.display=''; le.textContent='最終更新 '+fmtDT(bk.updatedAt)+' · '+(bk.teacher||''); }
-    else le.style.display='none';
-  } else {
-    if(pri) parseLabel(pri.label); else{ document.getElementById('gradeSel').value=1; document.getElementById('classSel').value=1; }
+  // 既存予約リストを描画
+  renderBookingList(bks);
+
+  // 定員表示
+  document.getElementById('capInfo').textContent = '定員 '+cap+' クラス　現在 '+bks.length+' クラス予約中';
+
+  // 追加フォーム：定員に空きがあれば表示
+  const addForm = document.getElementById('addForm');
+  if(bks.length < cap){
+    addForm.style.display='';
+    document.getElementById('gradeSel').value=1;
+    document.getElementById('classSel').value=1;
     document.getElementById('teacherIn').value='';
-    document.getElementById('delBtn').style.display='none';
     document.getElementById('saveBtn').textContent='予約する';
-    document.getElementById('lastEdit').style.display='none';
+  } else {
+    addForm.style.display='none';
   }
+  document.getElementById('lastEdit').style.display='none';
   document.getElementById('modalBg').classList.add('show');
-  setTimeout(()=>document.getElementById('teacherIn').focus(),50);
+  setTimeout(()=>{if(bks.length<cap)document.getElementById('teacherIn').focus();},50);
 }
+
+function renderBookingList(bks){
+  const ul = document.getElementById('bookingList');
+  ul.innerHTML='';
+  if(!bks.length){ ul.innerHTML='<li style="color:var(--text3);font-size:12px;padding:4px 0">予約なし</li>'; return; }
+  bks.forEach(bk=>{
+    const li = document.createElement('li');
+    li.style.cssText='display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:.5px solid var(--border);font-size:13px';
+    li.innerHTML=
+      '<span style="font-weight:500;flex:1">'+esc(bk.classLabel)+'</span>'+
+      '<span style="color:var(--text3);font-size:11px">'+esc(bk.teacher||'')+'</span>'+
+      '<button class="danger" style="padding:3px 8px;font-size:11px" onclick="doDelete(\''+bk.id+'\')">取消</button>';
+    ul.appendChild(li);
+  });
+}
+
 function closeModal(){ document.getElementById('modalBg').classList.remove('show'); activeCell=null; }
 
 async function saveBooking(){
@@ -429,9 +474,18 @@ async function saveBooking(){
   try{
     const res = await api('POST',{action:'saveBooking',roomId,dateStr:cell.dateStr,period:cell.period,classLabel,teacher});
     if(!res.ok) throw new Error(res.error);
-    st.bookings = st.bookings.filter(b=>!(b.roomId===roomId&&b.date===cell.dateStr&&b.period===cell.period));
-    st.bookings.push({roomId,date:cell.dateStr,period:cell.period,classLabel,teacher,updatedAt:Date.now()});
-    closeModal(); renderCal();
+    // ローカルに追加（idはサーバーが知っているので次の週取得時に同期される）
+    const newBk = {id:'tmp_'+Date.now(),roomId,date:cell.dateStr,period:cell.period,classLabel,teacher,updatedAt:Date.now()};
+    st.bookings.push(newBk);
+    activeCell.bks = getBks(roomId, cell.dateStr, cell.period);
+    renderBookingList(activeCell.bks);
+    // 定員チェック更新
+    const r = st.rooms.find(x=>x.id===roomId);
+    const cap = r ? r.capacity : 1;
+    document.getElementById('capInfo').textContent='定員 '+cap+' クラス　現在 '+activeCell.bks.length+' クラス予約中';
+    if(activeCell.bks.length >= cap) document.getElementById('addForm').style.display='none';
+    document.getElementById('teacherIn').value='';
+    renderCal();
   } catch(e){
     alert('エラー: '+e.message);
   } finally{
@@ -439,20 +493,29 @@ async function saveBooking(){
   }
 }
 
-async function deleteBooking(){
-  const cell = activeCell;
-  if(!cell) return;
+async function doDelete(bookingId){
   if(!confirm('この予約を取消しますか？')) return;
   const teacher = document.getElementById('teacherIn').value.trim()||'(不明)';
-  const roomId = st.roomId;
   try{
-    const res = await api('POST',{action:'deleteBooking',roomId,dateStr:cell.dateStr,period:cell.period,teacher});
+    const res = await api('POST',{action:'deleteBooking',bookingId,teacher});
     if(!res.ok) throw new Error(res.error);
-    st.bookings = st.bookings.filter(b=>!(b.roomId===roomId&&b.date===cell.dateStr&&b.period===cell.period));
-    closeModal(); renderCal();
+    st.bookings = st.bookings.filter(b=>b.id!==bookingId);
+    if(activeCell){
+      activeCell.bks = getBks(st.roomId, activeCell.dateStr, activeCell.period);
+      renderBookingList(activeCell.bks);
+      const r = st.rooms.find(x=>x.id===st.roomId);
+      const cap = r ? r.capacity : 1;
+      document.getElementById('capInfo').textContent='定員 '+cap+' クラス　現在 '+activeCell.bks.length+' クラス予約中';
+      if(activeCell.bks.length < cap) document.getElementById('addForm').style.display='';
+    }
+    renderCal();
   } catch(e){ alert('エラー: '+e.message); }
 }
 
+// 同じ枠の予約を返す
+function getBks(roomId, dateStr, period){
+  return st.bookings.filter(b=>b.roomId===roomId&&b.date===dateStr&&b.period===period);
+}
 // ==========================================
 // 優先クラス
 // ==========================================
