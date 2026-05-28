@@ -107,6 +107,72 @@ input[type=text]{flex:1;min-width:140px}
 /* ローディング */
 .loading{text-align:center;padding:48px;color:var(--text3);font-size:14px}
 
+/* 優先時間割パネル */
+.tt-panel{display:none;flex:1;min-width:0}
+.tt-panel.show{display:block}
+
+/* 教室ナビ（横スクロールスティッキー） */
+.tt-nav{
+  position:sticky;top:52px;z-index:90;
+  background:var(--bg);
+  border-bottom:.5px solid var(--border);
+  padding:8px 0;
+  display:flex;gap:6px;flex-wrap:wrap;
+  margin-bottom:16px;
+}
+.tt-nav-btn{
+  padding:5px 12px;font-size:12px;border-radius:20px;
+  background:var(--bg2);border:.5px solid var(--border2);
+  color:var(--text2);cursor:pointer;font-family:inherit;
+  white-space:nowrap;transition:background .1s,color .1s;
+}
+.tt-nav-btn:hover{background:var(--p50);color:var(--p900);border-color:var(--p200)}
+.tt-nav-btn.active{background:var(--p50);color:var(--p900);border-color:var(--p200);font-weight:500}
+
+/* カードグリッド */
+.tt-grid{display:flex;flex-direction:column;gap:20px}
+
+/* 教室カード */
+.tt-card{background:var(--bg);border:.5px solid var(--border);border-radius:var(--rl);overflow:hidden}
+.tt-card-hdr{
+  padding:10px 14px;background:var(--bg2);
+  border-bottom:.5px solid var(--border);
+  display:flex;align-items:center;gap:8px;
+}
+.tt-card-name{font-size:14px;font-weight:500;color:var(--text)}
+.tt-card-cap{font-size:11px;color:var(--text3);margin-left:auto}
+
+/* 時間割テーブル */
+.tt-tbl{width:100%;border-collapse:collapse;table-layout:fixed;font-size:12px}
+.tt-tbl th{
+  padding:7px 4px;text-align:center;font-size:11px;font-weight:400;
+  color:var(--text3);background:var(--bg2);
+  border-bottom:.5px solid var(--border);
+  border-right:.5px solid var(--border);
+}
+.tt-tbl th:last-child{border-right:none}
+.tt-tbl td{
+  padding:6px 4px;text-align:center;
+  border-bottom:.5px solid var(--border);
+  border-right:.5px solid var(--border);
+  vertical-align:middle;height:38px;
+}
+.tt-tbl td:last-child{border-right:none}
+.tt-tbl tr:last-child td{border-bottom:none}
+.tt-per{font-size:11px;color:var(--text3);width:38px;background:var(--bg2)}
+.tt-badge{
+  background:var(--p50);color:var(--p900);
+  font-size:11px;font-weight:500;
+  border-radius:4px;padding:2px 5px;
+  display:inline-block;white-space:nowrap;margin:1px 0;
+}
+.tt-empty{color:var(--border2);font-size:14px}
+.tt-no-data{font-size:12px;color:var(--text3);padding:20px;text-align:center}
+
+@media(max-width:640px){
+  .tt-nav{top:52px;padding:6px 8px}
+}
+
 /* API設定バナー */
 .api-banner{background:#fffbe6;border:.5px solid #f0c040;border-radius:var(--r);padding:12px 16px;margin-bottom:16px;font-size:13px;color:#7a5c00;display:none}
 .api-banner.show{display:block}
@@ -131,6 +197,7 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbzwdBlpjAUgz1SUNhysy0Vq
   <div class="hdr-sep"></div>
   <button class="tab-btn active" id="tabCal" onclick="switchTab('cal')">週間カレンダー</button>
   <button class="tab-btn" id="tabPri" onclick="switchTab('pri')">優先クラス管理</button>
+  <button class="tab-btn" id="tabTt"  onclick="switchTab('tt')">優先時間割</button>
 </header>
 
 <div class="layout">
@@ -188,6 +255,16 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbzwdBlpjAUgz1SUNhysy0Vq
     <div class="card" style="padding:0;overflow:hidden">
       <p style="font-size:12px;color:var(--text3);padding:10px 16px;background:var(--bg2);border-bottom:.5px solid var(--border)">登録済み優先クラス</p>
       <ul class="pri-list" id="priList" style="padding:0 16px"></ul>
+    </div>
+  </div>
+
+  <!-- 優先時間割パネル -->
+  <div class="tt-panel" id="ttPanel">
+    <!-- 教室ナビ（sticky） -->
+    <div class="tt-nav" id="ttNav"></div>
+    <!-- カードグリッド -->
+    <div class="tt-grid" id="ttGrid">
+      <div class="loading">読み込み中...</div>
     </div>
   </div>
 </div>
@@ -462,56 +539,70 @@ function renderBookingList(bks){
 
 function closeModal(){ document.getElementById('modalBg').classList.remove('show'); activeCell=null; }
 
-async function saveBooking(){
+function saveBooking(){
   const cell = activeCell;
   if(!cell) return;
   const teacher = document.getElementById('teacherIn').value.trim();
   if(!teacher){ document.getElementById('errMsg').style.display=''; document.getElementById('teacherIn').focus(); return; }
   const classLabel = buildLabel();
   const roomId = st.roomId;
-  const btn = document.getElementById('saveBtn');
-  btn.disabled=true; btn.textContent='送信中…';
-  try{
-    const res = await api('POST',{action:'saveBooking',roomId,dateStr:cell.dateStr,period:cell.period,classLabel,teacher});
-    if(!res.ok) throw new Error(res.error);
-    // ローカルに追加（idはサーバーが知っているので次の週取得時に同期される）
-    const newBk = {id:'tmp_'+Date.now(),roomId,date:cell.dateStr,period:cell.period,classLabel,teacher,updatedAt:Date.now()};
-    st.bookings.push(newBk);
-    activeCell.bks = getBks(roomId, cell.dateStr, cell.period);
-    renderBookingList(activeCell.bks);
-    // 定員チェック更新
-    const r = st.rooms.find(x=>x.id===roomId);
-    const cap = r ? r.capacity : 1;
-    document.getElementById('capInfo').textContent='定員 '+cap+' クラス　現在 '+activeCell.bks.length+' クラス予約中';
-    if(activeCell.bks.length >= cap) document.getElementById('addForm').style.display='none';
-    document.getElementById('teacherIn').value='';
-    renderCal();
-  } catch(e){
-    alert('エラー: '+e.message);
-  } finally{
-    btn.disabled=false; btn.textContent='予約する';
-  }
+
+  // 楽観的更新: 即座に画面反映
+  const tmpId = 'tmp_'+Date.now();
+  const newBk = {id:tmpId,roomId,date:cell.dateStr,period:cell.period,classLabel,teacher,updatedAt:Date.now()};
+  const prevBks = getBks(roomId,cell.dateStr,cell.period);
+  const sameIdx = prevBks.findIndex(b=>b.classLabel===classLabel);
+  let replaced = null;
+  if(sameIdx>=0){ replaced=prevBks[sameIdx]; st.bookings=st.bookings.filter(b=>b.id!==replaced.id); }
+  st.bookings.push(newBk);
+  if(activeCell){ activeCell.bks=getBks(roomId,cell.dateStr,cell.period); renderBookingList(activeCell.bks); }
+  const r0=st.rooms.find(x=>x.id===roomId); const cap0=r0?r0.capacity:1;
+  document.getElementById('capInfo').textContent='定員 '+cap0+' クラス　現在 '+getBks(roomId,cell.dateStr,cell.period).length+' クラス予約中';
+  if(getBks(roomId,cell.dateStr,cell.period).length>=cap0) document.getElementById('addForm').style.display='none';
+  document.getElementById('teacherIn').value='';
+  renderCal();
+
+  // バックグラウンドでGASに保存
+  api('POST',{action:'saveBooking',roomId,dateStr:cell.dateStr,period:cell.period,classLabel,teacher})
+    .then(res=>{
+      if(!res.ok){
+        st.bookings=st.bookings.filter(b=>b.id!==tmpId);
+        if(replaced) st.bookings.push(replaced);
+        if(activeCell){ activeCell.bks=getBks(roomId,cell.dateStr,cell.period); renderBookingList(activeCell.bks); }
+        renderCal(); showToast('保存に失敗しました: '+res.error,true);
+      } else { showToast('予約しました'); }
+    })
+    .catch(e=>showToast('通信エラー: '+e.message,true));
 }
 
-async function doDelete(bookingId){
+function doDelete(bookingId){
   if(!confirm('この予約を取消しますか？')) return;
   const teacher = document.getElementById('teacherIn').value.trim()||'(不明)';
-  try{
-    const res = await api('POST',{action:'deleteBooking',bookingId,teacher});
-    if(!res.ok) throw new Error(res.error);
-    st.bookings = st.bookings.filter(b=>b.id!==bookingId);
-    if(activeCell){
-      activeCell.bks = getBks(st.roomId, activeCell.dateStr, activeCell.period);
-      renderBookingList(activeCell.bks);
-      const r = st.rooms.find(x=>x.id===st.roomId);
-      const cap = r ? r.capacity : 1;
-      document.getElementById('capInfo').textContent='定員 '+cap+' クラス　現在 '+activeCell.bks.length+' クラス予約中';
-      if(activeCell.bks.length < cap) document.getElementById('addForm').style.display='';
-    }
-    renderCal();
-  } catch(e){ alert('エラー: '+e.message); }
-}
+  const roomId = st.roomId;
 
+  // 楽観的更新: 即座に削除
+  const prevBk = st.bookings.find(b=>b.id===bookingId);
+  st.bookings = st.bookings.filter(b=>b.id!==bookingId);
+  if(activeCell){
+    activeCell.bks=getBks(roomId,activeCell.dateStr,activeCell.period);
+    renderBookingList(activeCell.bks);
+    const r1=st.rooms.find(x=>x.id===roomId); const cap1=r1?r1.capacity:1;
+    document.getElementById('capInfo').textContent='定員 '+cap1+' クラス　現在 '+activeCell.bks.length+' クラス予約中';
+    if(activeCell.bks.length<cap1) document.getElementById('addForm').style.display='';
+  }
+  renderCal();
+
+  // バックグラウンドでGASに保存
+  api('POST',{action:'deleteBooking',bookingId,teacher})
+    .then(res=>{
+      if(!res.ok){
+        if(prevBk) st.bookings.push(prevBk);
+        if(activeCell){ activeCell.bks=getBks(roomId,activeCell.dateStr,activeCell.period); renderBookingList(activeCell.bks); }
+        renderCal(); showToast('取消に失敗しました: '+res.error,true);
+      } else { showToast('予約を取消しました'); }
+    })
+    .catch(e=>showToast('通信エラー: '+e.message,true));
+}
 // 同じ枠の予約を返す
 function getBks(roomId, dateStr, period){
   return st.bookings.filter(b=>b.roomId===roomId&&b.date===dateStr&&b.period===period);
@@ -519,29 +610,80 @@ function getBks(roomId, dateStr, period){
 // ==========================================
 // 優先クラス
 // ==========================================
-async function addPriority(){
+function addPriority(){
   const roomId = document.getElementById('priRoom').value;
   const dayIdx = Number(document.getElementById('priDay').value);
   const period = Number(document.getElementById('priPeriod').value);
   const label  = document.getElementById('priClass').value;
-  try{
-    const res = await api('POST',{action:'setPriority',roomId,dayIdx,period,label});
-    if(!res.ok) throw new Error(res.error);
-    st.priorities = st.priorities.filter(p=>!(p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period));
-    st.priorities.push({roomId,dayIdx,period,label});
-    renderPriList();
-    if(st.roomId===roomId) renderCal();
-  } catch(e){ alert('エラー: '+e.message); }
+
+  // 楽観的更新: 即座に画面反映
+  const prev = st.priorities.filter(p=>p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period);
+  st.priorities = st.priorities.filter(p=>!(p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period));
+  st.priorities.push({roomId,dayIdx,period,label});
+  renderPriList();
+  if(st.roomId===roomId) renderCal();
+
+  // バックグラウンドでGASに保存
+  api('POST',{action:'setPriority',roomId,dayIdx,period,label})
+    .then(res=>{
+      if(!res.ok){
+        // 失敗したらロールバック
+        st.priorities = st.priorities.filter(p=>!(p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period));
+        prev.forEach(p=>st.priorities.push(p));
+        renderPriList();
+        if(st.roomId===roomId) renderCal();
+        showToast('保存に失敗しました: '+res.error, true);
+      } else {
+        showToast('優先クラスを登録しました');
+      }
+    })
+    .catch(e=>showToast('通信エラー: '+e.message, true));
 }
 
-async function removePriority(roomId,dayIdx,period){
-  try{
-    const res = await api('POST',{action:'setPriority',roomId,dayIdx,period,label:''});
-    if(!res.ok) throw new Error(res.error);
-    st.priorities = st.priorities.filter(p=>!(p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period));
-    renderPriList();
-    if(st.roomId===roomId) renderCal();
-  } catch(e){ alert('エラー: '+e.message); }
+function removePriority(roomId,dayIdx,period){
+  // 楽観的更新: 即座に削除
+  const prev = st.priorities.filter(p=>p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period);
+  st.priorities = st.priorities.filter(p=>!(p.roomId===roomId&&p.dayIdx===dayIdx&&p.period===period));
+  renderPriList();
+  if(st.roomId===roomId) renderCal();
+
+  // バックグラウンドでGASに保存
+  api('POST',{action:'setPriority',roomId,dayIdx,period,label:''})
+    .then(res=>{
+      if(!res.ok){
+        // 失敗したらロールバック
+        prev.forEach(p=>st.priorities.push(p));
+        renderPriList();
+        if(st.roomId===roomId) renderCal();
+        showToast('削除に失敗しました: '+res.error, true);
+      } else {
+        showToast('優先クラスを削除しました');
+      }
+    })
+    .catch(e=>showToast('通信エラー: '+e.message, true));
+}
+
+// トースト通知
+let toastTimer = null;
+function showToast(msg, isError=false){
+  let t = document.getElementById('toast');
+  if(!t){
+    t = document.createElement('div');
+    t.id = 'toast';
+    t.style.cssText = [
+      'position:fixed','bottom:24px','left:50%','transform:translateX(-50%)',
+      'padding:9px 18px','border-radius:20px','font-size:13px',
+      'z-index:9999','pointer-events:none','transition:opacity .3s',
+      'white-space:nowrap','box-shadow:0 2px 12px rgba(0,0,0,.15)'
+    ].join(';');
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.background = isError ? '#e24b4a' : '#26215c';
+  t.style.color = '#fff';
+  t.style.opacity = '1';
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ t.style.opacity='0'; }, 2500);
 }
 
 function renderPriList(){
@@ -581,8 +723,122 @@ async function loadWeek(){
 function switchTab(t){
   document.getElementById('calPanel').style.display = t==='cal'?'':'none';
   document.getElementById('priPanel').classList.toggle('show', t==='pri');
+  document.getElementById('ttPanel').classList.toggle('show', t==='tt');
   document.getElementById('tabCal').classList.toggle('active', t==='cal');
   document.getElementById('tabPri').classList.toggle('active', t==='pri');
+  document.getElementById('tabTt').classList.toggle('active', t==='tt');
+  if(t==='tt') renderTimetable();
+}
+
+// ==========================================
+// 優先時間割
+// ==========================================
+function renderTimetable(){
+  const nav  = document.getElementById('ttNav');
+  const grid = document.getElementById('ttGrid');
+  nav.innerHTML=''; grid.innerHTML='';
+
+  const DAYS_TT   = ['月','火','水','木','金'];
+  const PERIODS_TT = [1,2,3,4,5,6];
+
+  // 優先クラスが1件でも登録されている教室だけ先頭に、残りは後ろ
+  const withPri  = st.rooms.filter(r => st.priorities.some(p=>p.roomId===r.id));
+  const withoutPri = st.rooms.filter(r => !st.priorities.some(p=>p.roomId===r.id));
+  const orderedRooms = [...withPri, ...withoutPri];
+
+  orderedRooms.forEach(room=>{
+    // ── ナビボタン ──
+    const navBtn = document.createElement('button');
+    navBtn.className = 'tt-nav-btn';
+    navBtn.textContent = room.name;
+    navBtn.dataset.roomId = room.id;
+    navBtn.onclick = ()=>scrollToCard(room.id);
+    nav.appendChild(navBtn);
+
+    // ── カード ──
+    const card = document.createElement('div');
+    card.className = 'tt-card';
+    card.id = 'tt-card-'+room.id;
+
+    // 優先クラスマップ: dayIdx_period → [label, ...]
+    const priMap = {};
+    st.priorities.filter(p=>p.roomId===room.id).forEach(p=>{
+      const k = p.dayIdx+'_'+p.period;
+      if(!priMap[k]) priMap[k]=[];
+      priMap[k].push(p.label);
+    });
+
+    const hasPri = Object.keys(priMap).length > 0;
+
+    // ヘッダー
+    let hdrHtml =
+      '<div class="tt-card-hdr">'+
+      '<i class="ti ti-building" style="font-size:15px;color:var(--text3)" aria-hidden="true"></i>'+
+      '<span class="tt-card-name">'+esc(room.name)+'</span>';
+    if(room.capacity>1) hdrHtml += '<span class="tt-card-cap">定員 '+room.capacity+' クラス</span>';
+    hdrHtml += '</div>';
+
+    // テーブル
+    let tblHtml = '<div style="overflow-x:auto"><table class="tt-tbl">';
+    tblHtml += '<thead><tr><th class="tt-per"></th>';
+    DAYS_TT.forEach(d=>{ tblHtml+='<th>'+d+'</th>'; });
+    tblHtml += '</tr></thead><tbody>';
+
+    if(!hasPri){
+      tblHtml += '<tr><td colspan="6" class="tt-no-data">優先クラス未登録</td></tr>';
+    } else {
+      PERIODS_TT.forEach(p=>{
+        tblHtml += '<tr><td class="tt-per">'+p+'時限</td>';
+        for(let d=0;d<5;d++){
+          const k=d+'_'+p;
+          const labels=priMap[k];
+          if(labels&&labels.length>0){
+            tblHtml += '<td>'+labels.map(l=>'<span class="tt-badge">'+esc(l)+'</span>').join('<br>')+'</td>';
+          } else {
+            tblHtml += '<td><span class="tt-empty">—</span></td>';
+          }
+        }
+        tblHtml += '</tr>';
+      });
+    }
+    tblHtml += '</tbody></table></div>';
+
+    card.innerHTML = hdrHtml + tblHtml;
+    grid.appendChild(card);
+  });
+
+  // IntersectionObserver でスクロール位置に合わせてナビをハイライト
+  setupTtObserver();
+}
+
+function scrollToCard(roomId){
+  const card = document.getElementById('tt-card-'+roomId);
+  if(!card) return;
+  // sticky ヘッダー(52px) + ナビ(約56px) 分オフセット
+  const top = card.getBoundingClientRect().top + window.scrollY - 120;
+  window.scrollTo({top, behavior:'smooth'});
+  // ナビボタンのアクティブを即時更新
+  setNavActive(roomId);
+}
+
+function setNavActive(roomId){
+  document.querySelectorAll('.tt-nav-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.roomId===roomId);
+  });
+}
+
+let ttObserver = null;
+function setupTtObserver(){
+  if(ttObserver) ttObserver.disconnect();
+  ttObserver = new IntersectionObserver(entries=>{
+    entries.forEach(entry=>{
+      if(entry.isIntersecting){
+        const roomId = entry.target.id.replace('tt-card-','');
+        setNavActive(roomId);
+      }
+    });
+  },{rootMargin:'-120px 0px -60% 0px', threshold:0});
+  document.querySelectorAll('.tt-card').forEach(c=>ttObserver.observe(c));
 }
 
 // ==========================================
