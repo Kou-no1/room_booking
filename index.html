@@ -196,8 +196,8 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbzwdBlpjAUgz1SUNhysy0Vq
   <span class="hdr-title">📋 特別教室予約システム</span>
   <div class="hdr-sep"></div>
   <button class="tab-btn active" id="tabCal" onclick="switchTab('cal')">週間カレンダー</button>
-  <button class="tab-btn" id="tabPri" onclick="switchTab('pri')">優先クラス管理</button>
   <button class="tab-btn" id="tabTt"  onclick="switchTab('tt')">優先時間割</button>
+  <button class="tab-btn" id="tabPri" onclick="switchTab('pri')">優先クラス管理</button>
 </header>
 
 <div class="layout">
@@ -430,14 +430,14 @@ function renderCal(){
       const dt  = addDays(st.weekStart,i);
       const ds  = ymd(dt);
       const bks = st.bookings.filter(b=>b.roomId===st.roomId&&b.date===ds&&b.period===p);
-      const pri = st.priorities.find(pr=>pr.roomId===st.roomId&&pr.dayIdx===i&&pr.period===p);
-      grid.appendChild(mkCell(ds, p, bks, pri));
+      const pris = st.priorities.filter(pr=>pr.roomId===st.roomId&&pr.dayIdx===i&&pr.period===p);
+      grid.appendChild(mkCell(ds, p, bks, pris));
     });
   });
 }
 
-function mkCell(dateStr, period, bks, pri){
-  // bks = この枠の予約配列（複数クラス対応）
+function mkCell(dateStr, period, bks, pris){
+  // bks = この枠の予約配列、pris = この枠の優先クラス配列
   const btn = document.createElement('button');
   btn.className = 'g-cell';
   const room = st.rooms.find(x=>x.id===st.roomId);
@@ -445,19 +445,16 @@ function mkCell(dateStr, period, bks, pri){
 
   if(bks.length > 0){
     btn.classList.add('booked');
-    // 複数クラスを縦に並べる
     let html = '';
     bks.forEach(bk => {
       const ts = bk.updatedAt ? fmtDT(bk.updatedAt)+' · '+esc(bk.teacher) : esc(bk.teacher);
       html += '<span class="cell-cls" data-tip="最終更新 '+ts+'" style="display:block">'+esc(bk.classLabel)+'</span>';
       if(bk.teacher) html += '<span class="cell-tchr" style="display:block">'+esc(bk.teacher)+'</span>';
     });
-    // 定員に空きがあれば＋ボタンも表示
     if(bks.length < cap){
       html += '<span style="font-size:11px;color:var(--p600);margin-top:2px;display:block">＋追加</span>';
     }
     btn.innerHTML = html;
-    // ツールチップは最初のクラスに付ける
     const firstTs = bks[0].updatedAt ? fmtDT(bks[0].updatedAt)+' · '+esc(bks[0].teacher) : esc(bks[0].teacher);
     btn.dataset.tip = bks.length > 1
       ? bks.map(b=>esc(b.classLabel)).join(' / ')
@@ -465,13 +462,16 @@ function mkCell(dateStr, period, bks, pri){
     btn.addEventListener('mouseenter', showTip);
     btn.addEventListener('mousemove',  moveTip);
     btn.addEventListener('mouseleave', hideTip);
-  } else if(pri){
+  } else if(pris.length > 0){
     btn.classList.add('pri');
-    btn.innerHTML='<span class="cell-pribadge">優先</span><span style="font-size:13px;color:var(--g600)">'+esc(pri.label)+'</span>';
+    // 複数優先クラスを縦並び
+    const html = '<span class="cell-pribadge">優先</span>'
+      + pris.map(pr=>'<span style="font-size:13px;color:var(--g600);display:block">'+esc(pr.label)+'</span>').join('');
+    btn.innerHTML = html;
   } else {
     btn.classList.add('empty'); btn.textContent='+';
   }
-  btn.onclick = ()=>openModal(dateStr, period, bks, pri);
+  btn.onclick = ()=>openModal(dateStr, period, bks, pris);
   return btn;
 }
 
@@ -486,8 +486,8 @@ function hideTip(){ tipEl.classList.remove('show'); }
 // ==========================================
 // モーダル（複数クラス対応）
 // ==========================================
-function openModal(dateStr, period, bks, pri){
-  activeCell = {dateStr, period, bks};
+function openModal(dateStr, period, bks, pris){
+  activeCell = {dateStr, period, bks, pris};
   const r = st.rooms.find(x=>x.id===st.roomId);
   const cap = r ? r.capacity : 1;
   document.getElementById('mTitle').textContent = (r?r.name:'') + ' · ' + period + '校時';
@@ -497,7 +497,7 @@ function openModal(dateStr, period, bks, pri){
   document.getElementById('errMsg').style.display='none';
 
   const hint = document.getElementById('mHint');
-  if(pri){ hint.style.display=''; hint.textContent='⚠ この枠の優先クラスは「'+esc(pri.label)+'」です'; }
+  if(pris && pris.length>0){ hint.style.display=''; hint.textContent='⚠ この枠の優先クラス: '+pris.map(p=>p.label).join('、'); }
   else hint.style.display='none';
 
   // 既存予約リストを描画
